@@ -1,0 +1,49 @@
+# Cursor IDE (local rules, machine-specific)
+.cursor/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode — user-specific & local state
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad
+*.xccheckout
+*.xcscmblueprint
+
+# Xcode — build products & indexes
+build/
+DerivedData/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# Swift Package Manager
+.build/
+Packages/
+Package.pins
+.swiftpm/xcode/xcuserdata/
+
+# CocoaPods (if added later)
+Pods/
+
+# Carthage (if added later)
+Carthage/Build/
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Code Injection / third-party tooling
+iOSInjectionProject/
+
+# Environment & secrets (common local filenames)
+.env
+.env.*
+!.env.example
