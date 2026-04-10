@@ -1,6 +1,7 @@
 import Foundation
 import HealthKit
 import SwiftData
+import GRDB
 
 final class HealthKitService {
     private let healthStore = HKHealthStore()
@@ -135,11 +136,10 @@ final class HealthKitService {
     // Processes one data type at a time, in monthly chunks, to avoid
     // loading millions of samples into memory simultaneously.
 
-    @MainActor
     func syncHealthRecordsForType(
         mapping: RecordTypeMapping,
         since sinceDate: Date?,
-        modelContext: ModelContext
+        store: HealthRecordStore
     ) async throws -> Int {
         let quantityType = HKQuantityType(mapping.identifier)
 
@@ -168,24 +168,24 @@ final class HealthKitService {
                 type: quantityType, predicate: predicate
             )
 
-            for sample in samples {
-                let record = HealthRecord(
-                    category: mapping.category,
-                    metric: mapping.metric,
-                    value: sample.quantity.doubleValue(for: mapping.hkUnit),
-                    unit: mapping.displayUnit,
-                    source: sample.sourceRevision.source.name,
-                    startDate: Self.isoFormatter.string(from: sample.startDate),
-                    endDate: Self.isoFormatter.string(from: sample.endDate),
-                    date: Self.dayFormatter.string(from: sample.startDate)
-                )
-                modelContext.insert(record)
+            if !samples.isEmpty {
+                try store.deleteRecords(metric: mapping.metric, startDate: current, endDate: chunkEnd)
+
+                let records = samples.map { sample in
+                    HealthRecordStore.Record(
+                        category: mapping.category,
+                        metric: mapping.metric,
+                        value: sample.quantity.doubleValue(for: mapping.hkUnit),
+                        unit: mapping.displayUnit,
+                        source: sample.sourceRevision.source.name,
+                        startDate: Self.isoFormatter.string(from: sample.startDate),
+                        endDate: Self.isoFormatter.string(from: sample.endDate),
+                        date: Self.dayFormatter.string(from: sample.startDate)
+                    )
+                }
+                try store.insertRecords(records)
             }
             count += samples.count
-
-            if !samples.isEmpty {
-                try modelContext.save()
-            }
 
             current = chunkEnd
         }

@@ -64,7 +64,10 @@ final class SyncService {
         syncProgress = "Requesting HealthKit access..."
         try await healthKitService.requestAuthorization()
 
+        let store = HealthRecordStore.shared
+        let storeIsEmpty = (try? store.countRecords()) == 0
         let since = lastHealthKitSyncDate
+        let healthSince: Date? = storeIsEmpty ? nil : since
         let mappings = HealthKitService.recordTypeMappings
         var totalRecords = 0
 
@@ -75,12 +78,11 @@ final class SyncService {
             do {
                 let count = try await healthKitService.syncHealthRecordsForType(
                     mapping: mapping,
-                    since: since,
-                    modelContext: modelContext
+                    since: healthSince,
+                    store: store
                 )
                 totalRecords += count
             } catch {
-                // Skip types that fail (e.g., user denied permission for specific type)
                 continue
             }
         }

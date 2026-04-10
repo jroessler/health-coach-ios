@@ -5,6 +5,7 @@ import SwiftData
 struct HealthCoachApp: App {
     let syncService = SyncService()
     private let userProfileStore = UserProfileStore()
+    private let _healthRecordStore = HealthRecordStore.shared
 
     var body: some Scene {
         WindowGroup {
@@ -13,7 +14,6 @@ struct HealthCoachApp: App {
                 .environment(userProfileStore)
         }
         .modelContainer(for: [
-            HealthRecord.self,
             NutritionEntry.self,
             Workout.self,
             WorkoutSet.self,
@@ -30,6 +30,10 @@ struct ContentView: View {
             DashboardView()
                 .tabItem {
                     Label("Home", systemImage: "square.grid.2x2")
+                }
+            NutritionView()
+                .tabItem {
+                    Label("Nutrition", systemImage: "fork.knife")
                 }
             SettingsView()
                 .tabItem {

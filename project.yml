@@ -5,12 +5,22 @@ options:
     iOS: "17.0"
   xcodeVersion: "15.0"
   generateEmptyDirectories: true
+packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: "7.0.0"
+  MarkdownUI:
+    url: https://github.com/gonzalezreal/MarkdownUI
+    from: "2.4.1"
 targets:
   HealthCoach:
     type: application
     platform: iOS
     sources:
       - HealthCoach
+    dependencies:
+      - package: GRDB
+      - package: MarkdownUI
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jannik.healthcoach

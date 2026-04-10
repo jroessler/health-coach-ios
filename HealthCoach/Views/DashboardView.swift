@@ -217,19 +217,19 @@ actor StatsComputer {
     func compute() -> DashboardStats? {
         do {
             let foodEntries = try modelContext.fetchCount(FetchDescriptor<NutritionEntry>())
-            let healthRecords = try modelContext.fetchCount(FetchDescriptor<HealthRecord>())
             let workoutSessions = try modelContext.fetchCount(FetchDescriptor<Workout>())
             let totalSets = try modelContext.fetchCount(FetchDescriptor<WorkoutSet>())
 
-            let allNutrition = try modelContext.fetch(FetchDescriptor<NutritionEntry>())
-            let daysOfData = Set(allNutrition.map(\.date)).count
-            let nutritionDates = allNutrition.map(\.date)
-
-            let appleRange = try dateRange(for: HealthRecord.self)
-            let hevyRange = try dateRange(for: Workout.self)
+            let store = HealthRecordStore.shared
+            let healthRecords = try store.countRecords()
 
             let hasData = foodEntries > 0 || healthRecords > 0 || workoutSessions > 0
             guard hasData else { return nil }
+
+            let (daysOfData, nutritionRange) = try countNutritionDays()
+
+            let appleRange = try store.dateRange()
+            let hevyRange = try dateRange(for: Workout.self)
 
             return DashboardStats(
                 daysOfData: daysOfData,
@@ -238,7 +238,7 @@ actor StatsComputer {
                 workoutSessions: workoutSessions,
                 totalSets: totalSets,
                 appleRange: SourceDateRange(min: appleRange.min, max: appleRange.max),
-                macroFactorRange: SourceDateRange(min: nutritionDates.min(), max: nutritionDates.max()),
+                macroFactorRange: SourceDateRange(min: nutritionRange.min, max: nutritionRange.max),
                 hevyRange: SourceDateRange(min: hevyRange.min, max: hevyRange.max)
             )
         } catch {
@@ -246,16 +246,27 @@ actor StatsComputer {
         }
     }
 
-    private func dateRange(for type: HealthRecord.Type) throws -> (min: String?, max: String?) {
-        var ascDesc = FetchDescriptor<HealthRecord>(sortBy: [SortDescriptor(\.date)])
-        ascDesc.fetchLimit = 1
-        let earliest = try modelContext.fetch(ascDesc).first
+    private func countNutritionDays() throws -> (Int, (min: String?, max: String?)) {
+        var uniqueDates = Set<String>()
+        let batchSize = 5_000
+        var offset = 0
 
-        var descDesc = FetchDescriptor<HealthRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])
-        descDesc.fetchLimit = 1
-        let latest = try modelContext.fetch(descDesc).first
+        while true {
+            let ctx = ModelContext(modelContainer)
+            var desc = FetchDescriptor<NutritionEntry>(sortBy: [SortDescriptor(\.date)])
+            desc.fetchLimit = batchSize
+            desc.fetchOffset = offset
+            let batch = try ctx.fetch(desc)
+            if batch.isEmpty { break }
 
-        return (earliest?.date, latest?.date)
+            for entry in batch {
+                uniqueDates.insert(entry.date)
+            }
+            if batch.count < batchSize { break }
+            offset += batchSize
+        }
+
+        return (uniqueDates.count, (min: uniqueDates.min(), max: uniqueDates.max()))
     }
 
     private func dateRange(for type: Workout.Type) throws -> (min: String?, max: String?) {

@@ -198,7 +198,7 @@ struct SettingsView: View {
 
     private func clearAllData() {
         do {
-            try modelContext.delete(model: HealthRecord.self)
+            try HealthRecordStore.shared.deleteAllRecords()
             try modelContext.delete(model: NutritionEntry.self)
             try modelContext.delete(model: Workout.self)
             try modelContext.delete(model: WorkoutSet.self)
@@ -206,7 +206,6 @@ struct SettingsView: View {
             try modelContext.save()
             UserDefaults.standard.removeObject(forKey: "lastSyncDate")
             UserDefaults.standard.removeObject(forKey: "lastHealthKitSyncDate")
-            // Do not remove UserProfileStore keys — profile must survive cache clears.
         } catch {
             syncService.syncError = "Failed to clear data: \(error.localizedDescription)"
         }
