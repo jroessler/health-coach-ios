@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		069151337FFE226C28F11F9B /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 27E34DAA506E338FF9F94FEC /* GRDB */; };
 		0AEFC842C04D908AD983F923 /* StatCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E28340114CBA42F62AC2036 /* StatCard.swift */; };
+		D365519AE77B45D28E78EB27 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 651B9032E1CD466584241743 /* LoadingView.swift */; };
 		0E4DC056C6AEACD3661A2CEB /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 794AA663C1D747A4CBD1F1F8 /* UserProfile.swift */; };
 		1D72F456BC4AB81A4E57DFA9 /* ChartSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36A831170CFCE5F988D71D52 /* ChartSection.swift */; };
 		1DED2FDF6D50FB1AE904FAF7 /* MacroTargetBars.swift in Sources */ = {isa = PBXBuildFile; fileRef = C890FF1E3E29294AF1127708 /* MacroTargetBars.swift */; };
@@ -52,6 +53,7 @@
 		08DE7BED8A76C27CB47B527E /* NutritionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionView.swift; sourceTree = "<group>"; };
 		09B425B812F96172135C2025 /* NutritionKPIGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionKPIGrid.swift; sourceTree = "<group>"; };
 		0E28340114CBA42F62AC2036 /* StatCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatCard.swift; sourceTree = "<group>"; };
+		651B9032E1CD466584241743 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
 		117B2748DF7E84E162D871DC /* WeightTrendsChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightTrendsChart.swift; sourceTree = "<group>"; };
 		159BB8AF025C2EE1ECB05130 /* HealthRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthRecord.swift; sourceTree = "<group>"; };
 		23EEEAB0008B3C57C86EFEBD /* HevyAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HevyAPIService.swift; sourceTree = "<group>"; };
@@ -136,6 +138,7 @@
 			isa = PBXGroup;
 			children = (
 				0E28340114CBA42F62AC2036 /* StatCard.swift */,
+				651B9032E1CD466584241743 /* LoadingView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -340,6 +343,7 @@
 				67E0B675C11AFCF678A41B1B /* PreWorkoutChart.swift in Sources */,
 				C5A192D7D8EE354EC3267643 /* SettingsView.swift in Sources */,
 				0AEFC842C04D908AD983F923 /* StatCard.swift in Sources */,
+				D365519AE77B45D28E78EB27 /* LoadingView.swift in Sources */,
 				2F9EC40997F9C70B7F5F2B3C /* SyncService.swift in Sources */,
 				7B44D572738FCA1A7B73CA92 /* TrainingVolumeTargetsView.swift in Sources */,
 				0E4DC056C6AEACD3661A2CEB /* UserProfile.swift in Sources */,

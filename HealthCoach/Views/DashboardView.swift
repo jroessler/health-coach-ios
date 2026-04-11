@@ -6,7 +6,7 @@ struct DashboardView: View {
     @Environment(SyncService.self) private var syncService
 
     @State private var stats: DashboardStats?
-    @State private var isLoadingStats = false
+    @State private var isLoadingStats = true
 
     private let bgColor = Color(hex: 0x02161C)
     private let accentCyan = Color(hex: 0x22D3EE)
@@ -35,10 +35,14 @@ struct DashboardView: View {
             .toolbarBackground(bgColor, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .onAppear {
+                // Reset synchronously so the dumbbell is visible before the
+                // async task even starts — prevents a stale-content flash.
+                stats = nil
+                isLoadingStats = true
+            }
             .task {
-                if stats == nil {
-                    await loadStatsInBackground()
-                }
+                await loadStatsInBackground()
             }
         }
     }
@@ -165,15 +169,7 @@ struct DashboardView: View {
     // MARK: - Loading State
 
     private var loadingState: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-                .tint(accentCyan)
-                .controlSize(.large)
-            Text("Loading stats...")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.5))
-        }
-        .padding(.top, 40)
+        LoadingView(message: "Computing stats…")
     }
 
     // MARK: - Empty State
@@ -202,7 +198,9 @@ struct DashboardView: View {
     }
 
     private func loadStatsInBackground() async {
-        isLoadingStats = true
+        // Yield immediately so the main thread can finish rendering the
+        // loading indicator before any synchronous @ModelActor setup runs.
+        await Task.yield()
         let container = modelContext.container
         let computer = StatsComputer(modelContainer: container)
         stats = await computer.compute()

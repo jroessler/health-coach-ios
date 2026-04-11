@@ -6,7 +6,7 @@ struct NutritionView: View {
     @Environment(UserProfileStore.self) private var profileStore
 
     @State private var snapshot: NutritionSnapshot?
-    @State private var isLoading = false
+    @State private var isLoading = true
     @State private var dateStart = Calendar.current.date(byAdding: .day, value: -30, to: Date())!
     @State private var dateEnd = Date()
     @State private var loadTask: Task<Void, Never>?
@@ -30,6 +30,10 @@ struct NutritionView: View {
             .toolbarBackground(bgColor, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .onAppear {
+                snapshot = nil
+                isLoading = true
+            }
             .task { await loadData() }
             .onChange(of: dateStart) { scheduleLoad() }
             .onChange(of: dateEnd) { scheduleLoad() }
@@ -167,15 +171,7 @@ struct NutritionView: View {
     // MARK: - States
 
     private var loadingState: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-                .tint(accentCyan)
-                .controlSize(.large)
-            Text("Computing nutrition data...")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.5))
-        }
-        .padding(.top, 60)
+        LoadingView(message: "Computing nutrition data…")
     }
 
     private var emptyState: some View {
@@ -213,6 +209,7 @@ struct NutritionView: View {
     private func loadData() async {
         isLoading = true
         snapshot = nil
+        await Task.yield()
         let container = modelContext.container
         let computer = NutritionComputer(modelContainer: container)
         let start = Calendar.current.startOfDay(for: dateStart)
