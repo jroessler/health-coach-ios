@@ -26,16 +26,6 @@ struct NutritionKPIGrid: View {
                 accentColor: colorForDelta(kpis.totalWeightChange)
             )
             KPICard(
-                label: "4w avg Δ Weight",
-                value: formatOptional(kpis.fourWeekAvgWeightDelta, suffix: "kg/wk", decimals: 2),
-                accentColor: colorForDelta(kpis.fourWeekAvgWeightDelta)
-            )
-            KPICard(
-                label: "4w avg Δ Body Fat",
-                value: formatOptional(kpis.fourWeekAvgBodyFatDelta, suffix: "%/wk", decimals: 2),
-                accentColor: colorForDelta(kpis.fourWeekAvgBodyFatDelta)
-            )
-            KPICard(
                 label: "7d avg Protein/kg",
                 value: String(format: "%.2fg/kg", kpis.sevenDayProteinPerKg),
                 accentColor: proteinColor(kpis.sevenDayProteinPerKg)

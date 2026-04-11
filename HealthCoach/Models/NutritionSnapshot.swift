@@ -22,8 +22,6 @@ struct NutritionKPIs: Sendable {
     let last7dAvgKcal: Double
     let totalBodyFatChange: Double?
     let totalWeightChange: Double?
-    let fourWeekAvgWeightDelta: Double?
-    let fourWeekAvgBodyFatDelta: Double?
     let sevenDayProteinPerKg: Double
 }
 

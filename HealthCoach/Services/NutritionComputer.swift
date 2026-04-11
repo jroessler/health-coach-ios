@@ -270,8 +270,6 @@ actor NutritionComputer {
     // MARK: - compute_kpi_values (lines 471-518)
 
     private func computeKPIValues(_ macrosPct: [MacroRow], scale: [ScaleRow], dateStart: Date, dateEnd: Date) -> NutritionKPIs {
-        let rangeDays = Self.cal.dateComponents([.day], from: dateStart, to: dateEnd).day! + 1
-
         let macrosInRange = macrosPct.filter { $0.date >= dateStart && $0.date <= dateEnd }
         let scaleInRange = scale.filter { $0.date >= dateStart && $0.date <= dateEnd && $0.weightKg != nil }
             .sorted { $0.date < $1.date }
@@ -284,8 +282,6 @@ actor NutritionComputer {
 
         var bfChange: Double?
         var wtChange: Double?
-        var last4wAvgKg: Double?
-        var last4wAvgBf: Double?
 
         if !scaleInRange.isEmpty {
             let bfRows = scaleInRange.filter { $0.fatPercent != nil }
@@ -297,34 +293,6 @@ actor NutritionComputer {
             }
         }
 
-        // 4-week averages (only if range >= 30 days and >= 4 weight rows)
-        if rangeDays >= 30 && scaleInRange.count >= 4 {
-            let weeklyGroups = groupByMondayWeek(scaleInRange.map { ($0.date, $0.weightKg!, $0.fatPercent) })
-            if weeklyGroups.count >= 2 {
-                let weeklyLast = weeklyGroups.map { (ws: $0.weekStart, wt: $0.values.last!.weight, bf: $0.values.last!.bf) }
-                var deltaKg: [Double] = []
-                var deltaBf: [Double] = []
-                for i in 1..<weeklyLast.count {
-                    deltaKg.append(weeklyLast[i].wt - weeklyLast[i-1].wt)
-                    if let bf1 = weeklyLast[i].bf, let bf0 = weeklyLast[i-1].bf {
-                        deltaBf.append(bf1 - bf0)
-                    }
-                }
-                let lastFourKg = Array(deltaKg.suffix(4))
-                if !lastFourKg.isEmpty {
-                    let m = lastFourKg.mean()
-                    last4wAvgKg = (m * 100).rounded() / 100
-                    if last4wAvgKg == 0 { last4wAvgKg = 0 }
-                }
-                let lastFourBf = Array(deltaBf.suffix(4))
-                if !lastFourBf.isEmpty {
-                    let m = lastFourBf.mean()
-                    last4wAvgBf = (m * 100).rounded() / 100
-                    if last4wAvgBf == 0 { last4wAvgBf = 0 }
-                }
-            }
-        }
-
         let latestWeight = scaleInRange.last?.weightKg ?? 75.0
         let proteinPerKg = latestWeight > 0 ? (avgProtein7d / latestWeight * 100).rounded() / 100 : 0
 
@@ -332,8 +300,6 @@ actor NutritionComputer {
             last7dAvgKcal: avgCalories7d,
             totalBodyFatChange: bfChange,
             totalWeightChange: wtChange,
-            fourWeekAvgWeightDelta: last4wAvgKg,
-            fourWeekAvgBodyFatDelta: last4wAvgBf,
             sevenDayProteinPerKg: proteinPerKg
         )
     }

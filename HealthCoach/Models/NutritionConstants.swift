@@ -24,5 +24,7 @@ enum NutritionConstants {
 
     static let preWorkoutTimingGoodMin = 60
     static let preWorkoutTimingGoodMax = 120
+    /// X-axis for pre-workout chart: plot uses `axisMax - minutesBefore` so labels read 200→0 (Streamlit parity).
+    static let preWorkoutChartAxisMaxMinutes: Double = 200
     static let postWorkoutTimingTargetMin = 120
 }

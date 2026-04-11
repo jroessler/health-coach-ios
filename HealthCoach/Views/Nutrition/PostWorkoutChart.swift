@@ -6,7 +6,6 @@ struct PostWorkoutChart: View {
 
     private let proteinTarget = NutritionConstants.proteinPostWorkoutTargetG
     private let minutesTarget = NutritionConstants.postWorkoutTimingTargetMin
-    private let trendName = "Trend (protein vs timing)"
 
     var body: some View {
         if points.isEmpty {
@@ -30,36 +29,10 @@ struct PostWorkoutChart: View {
                 RuleMark(x: .value("Time Target", minutesTarget))
                     .foregroundStyle(Color(hex: 0xFBBF24))
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 4]))
-                    .annotation(position: .topTrailing) {
-                        Text("120 min")
-                            .font(.system(size: 9))
-                            .foregroundStyle(Color(hex: 0xFBBF24))
-                    }
 
                 RuleMark(y: .value("Protein Target", proteinTarget))
                     .foregroundStyle(Color(hex: 0x3B82F6))
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [4, 4]))
-                    .annotation(position: .topLeading) {
-                        Text("\(Int(proteinTarget))g protein")
-                            .font(.system(size: 9))
-                            .foregroundStyle(Color(hex: 0x3B82F6))
-                    }
-
-                if let seg = trendSegment {
-                    LineMark(
-                        x: .value("Minutes After", seg.x0),
-                        y: .value("Protein (g)", seg.y0),
-                        series: .value("Series", trendName)
-                    )
-                    .foregroundStyle(by: .value("Series", trendName))
-                    LineMark(
-                        x: .value("Minutes After", seg.x1),
-                        y: .value("Protein (g)", seg.y1),
-                        series: .value("Series", trendName)
-                    )
-                    .foregroundStyle(by: .value("Series", trendName))
-                    .lineStyle(StrokeStyle(lineWidth: 2))
-                }
 
                 ForEach(points) { point in
                     PointMark(
@@ -70,9 +43,8 @@ struct PostWorkoutChart: View {
                     .symbolSize(120)
                 }
             }
-            .chartForegroundStyleScale([
-                trendName: Color.white.opacity(0.55),
-            ])
+            .chartXScale(domain: 0...130)
+            .chartYScale(domain: 0...150)
             .chartXAxisLabel("Minutes After Workout")
             .chartYAxisLabel("Protein (g)")
             .chartXAxis {
@@ -98,23 +70,27 @@ struct PostWorkoutChart: View {
         }
     }
 
-    private var trendSegment: (x0: Double, y0: Double, x1: Double, y1: Double)? {
-        let xs = points.map { Double($0.minutesAfter) }
-        let ys = points.map(\.proteinG)
-        guard let fit = ChartLinearRegression.slopeIntercept(xs: xs, ys: ys) else { return nil }
-        let xLo = xs.min() ?? 0
-        let xHi = xs.max() ?? 0
-        guard xHi > xLo else { return nil }
-        let y0 = fit.slope * xLo + fit.intercept
-        let y1 = fit.slope * xHi + fit.intercept
-        return (xLo, y0, xHi, y1)
-    }
-
     private var legend: some View {
-        HStack(spacing: 16) {
-            legendItem(color: color(for: .good), label: "Optimal")
-            legendItem(color: color(for: .ok), label: "Partially met")
-            legendItem(color: color(for: .bad), label: "Both missed")
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 16) {
+                legendItem(color: color(for: .good), label: "Optimal")
+                legendItem(color: color(for: .ok), label: "Partially met")
+                legendItem(color: color(for: .bad), label: "Both missed")
+            }
+            HStack(spacing: 16) {
+                legendDashedRule(
+                    color: Color(hex: 0xFBBF24),
+                    dash: [6, 4],
+                    axis: .vertical,
+                    label: "\(Int(minutesTarget)) min target"
+                )
+                legendDashedRule(
+                    color: Color(hex: 0x3B82F6),
+                    dash: [4, 4],
+                    axis: .horizontal,
+                    label: "Protein target: \(Int(proteinTarget))g"
+                )
+            }
         }
         .font(.caption2)
     }
@@ -124,6 +100,34 @@ struct PostWorkoutChart: View {
             Circle().fill(color).frame(width: 8, height: 8)
             Text(label).foregroundStyle(.white.opacity(0.6))
         }
+    }
+
+    private enum LegendRuleAxis {
+        case horizontal
+        case vertical
+    }
+
+    private func legendDashedRule(color: Color, dash: [CGFloat], axis: LegendRuleAxis, label: String) -> some View {
+        HStack(spacing: 4) {
+            legendDashedRuleSwatch(color: color, dash: dash, axis: axis)
+            Text(label).foregroundStyle(.white.opacity(0.6))
+        }
+    }
+
+    private func legendDashedRuleSwatch(color: Color, dash: [CGFloat], axis: LegendRuleAxis) -> some View {
+        let w: CGFloat = axis == .horizontal ? 16 : 3
+        let h: CGFloat = axis == .horizontal ? 3 : 12
+        return Path { path in
+            if axis == .horizontal {
+                path.move(to: CGPoint(x: 0, y: h / 2))
+                path.addLine(to: CGPoint(x: w, y: h / 2))
+            } else {
+                path.move(to: CGPoint(x: w / 2, y: 0))
+                path.addLine(to: CGPoint(x: w / 2, y: h))
+            }
+        }
+        .stroke(color, style: StrokeStyle(lineWidth: 2, dash: dash))
+        .frame(width: w, height: h)
     }
 
     private func color(for quality: WorkoutTimingQuality) -> Color {
