@@ -5,8 +5,11 @@ struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SyncService.self) private var syncService
 
+    @Environment(\.dismiss) private var dismiss
+
     @State private var stats: DashboardStats?
     @State private var isLoadingStats = true
+    @State private var showSettings = false
 
     private let bgColor = Color(hex: 0x02161C)
     private let accentCyan = Color(hex: 0x22D3EE)
@@ -35,6 +38,27 @@ struct DashboardView: View {
             .toolbarBackground(bgColor, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .foregroundStyle(accentCyan)
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .foregroundStyle(accentCyan)
+                    }
+                }
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
+            }
             .onAppear {
                 // Reset synchronously so the dumbbell is visible before the
                 // async task even starts — prevents a stale-content flash.

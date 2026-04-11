@@ -27,17 +27,13 @@ struct ContentView: View {
 
     var body: some View {
         TabView {
-            DashboardView()
-                .tabItem {
-                    Label("Home", systemImage: "square.grid.2x2")
-                }
             NutritionView()
                 .tabItem {
                     Label("Nutrition", systemImage: "fork.knife")
                 }
-            SettingsView()
+            ActivityView()
                 .tabItem {
-                    Label("Settings", systemImage: "gearshape")
+                    Label("Activity", systemImage: "figure.walk")
                 }
         }
         .toolbarBackground(tabBarBg, for: .tabBar)

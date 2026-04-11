@@ -4,6 +4,7 @@ import HealthKit
 struct SettingsView: View {
     @Environment(SyncService.self) private var syncService
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
 
     @State private var apiKeyInput = ""
     @State private var isKeyVisible = false
@@ -30,6 +31,12 @@ struct SettingsView: View {
             .toolbarBackground(bgColor, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .tint(accentCyan)
+                }
+            }
             .onAppear {
                 if let existing = KeychainService.shared.retrieve() {
                     apiKeyInput = existing

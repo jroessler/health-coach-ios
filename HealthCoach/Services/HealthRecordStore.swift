@@ -165,6 +165,60 @@ final class HealthRecordStore: Sendable {
         }
     }
 
+    // MARK: - Activity daily aggregates
+
+    struct ActivityDailyRow: Sendable {
+        let date: Date
+        let activeEnergyKcal: Double
+        let basalEnergyKcal: Double
+        let steps: Double
+        let exerciseMin: Double
+        let standMin: Double
+        /// nil when no walking_speed records exist for this date — mirrors Python AVG returning NULL.
+        let walkingSpeedKmh: Double?
+        let daylightMin: Double
+    }
+
+    /// Mirrors load_activity() in activity.py — one row per day with aggregated activity metrics.
+    func loadActivityDaily() throws -> [ActivityDailyRow] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT
+                    date AS date_str,
+                    SUM(CASE WHEN metric = 'active_energy'    THEN value ELSE 0 END) AS active_energy_kcal,
+                    SUM(CASE WHEN metric = 'basal_energy'     THEN value ELSE 0 END) AS basal_energy_kcal,
+                    SUM(CASE WHEN metric = 'steps'            THEN value ELSE 0 END) AS steps,
+                    SUM(CASE WHEN metric = 'exercise_minutes' THEN value ELSE 0 END) AS exercise_min,
+                    SUM(CASE WHEN metric = 'stand_minutes'    THEN value ELSE 0 END) AS stand_min,
+                    AVG(CASE WHEN metric = 'walking_speed'    THEN value END)        AS walking_speed_kmh,
+                    SUM(CASE WHEN metric = 'time_in_daylight' THEN value ELSE 0 END) AS daylight_min
+                FROM health_records
+                WHERE metric IN (
+                    'active_energy', 'basal_energy', 'steps',
+                    'exercise_minutes', 'stand_minutes',
+                    'walking_speed', 'time_in_daylight'
+                )
+                AND date IS NOT NULL
+                GROUP BY date
+                ORDER BY date
+            """)
+            return rows.compactMap { row -> ActivityDailyRow? in
+                guard let dateStr: String = row["date_str"],
+                      let date = Self.dayFormatter.date(from: dateStr) else { return nil }
+                return ActivityDailyRow(
+                    date: date,
+                    activeEnergyKcal: row["active_energy_kcal"] ?? 0,
+                    basalEnergyKcal: row["basal_energy_kcal"] ?? 0,
+                    steps: row["steps"] ?? 0,
+                    exerciseMin: row["exercise_min"] ?? 0,
+                    standMin: row["stand_min"] ?? 0,
+                    walkingSpeedKmh: row["walking_speed_kmh"],   // nil when no data — mirrors Python NaN skip
+                    daylightMin: row["daylight_min"] ?? 0
+                )
+            }
+        }
+    }
+
     // MARK: - Dashboard stats
 
     func countRecords() throws -> Int {

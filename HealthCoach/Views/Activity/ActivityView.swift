@@ -1,11 +1,11 @@
 import SwiftUI
 import SwiftData
 
-struct NutritionView: View {
+struct ActivityView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(UserProfileStore.self) private var profileStore
 
-    @State private var snapshot: NutritionSnapshot?
+    @State private var snapshot: ActivitySnapshot?
     @State private var isLoading = true
     @State private var dateStart = Calendar.current.date(byAdding: .day, value: -30, to: Date())!
     @State private var dateEnd = Date()
@@ -13,7 +13,7 @@ struct NutritionView: View {
     @State private var showSettings = false
     @State private var showHome = false
 
-    private let bgColor = Color(hex: 0x02161C)
+    private let bgColor    = Color(hex: 0x02161C)
     private let accentCyan = Color(hex: 0x22D3EE)
 
     var body: some View {
@@ -27,7 +27,7 @@ struct NutritionView: View {
                 .padding(.bottom, 96)
             }
             .background(bgColor.ignoresSafeArea())
-            .navigationTitle("Nutrition")
+            .navigationTitle("Activity")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(bgColor, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -62,7 +62,7 @@ struct NutritionView: View {
             }
             .task { await loadData() }
             .onChange(of: dateStart) { scheduleLoad() }
-            .onChange(of: dateEnd) { scheduleLoad() }
+            .onChange(of: dateEnd)   { scheduleLoad() }
         }
     }
 
@@ -96,7 +96,7 @@ struct NutritionView: View {
                 Spacer()
 
                 Menu {
-                    Button("Last 7 days") { setRange(days: 7) }
+                    Button("Last 7 days")  { setRange(days: 7) }
                     Button("Last 14 days") { setRange(days: 14) }
                     Button("Last 30 days") { setRange(days: 30) }
                     Button("Last 60 days") { setRange(days: 60) }
@@ -112,103 +112,85 @@ struct NutritionView: View {
         .padding(.vertical, 8)
     }
 
-    // MARK: - Main Content
+    // MARK: - Main content
 
     @ViewBuilder
     private var content: some View {
         if isLoading && snapshot == nil {
             loadingState
         } else if let snapshot {
-            nutritionContent(snapshot)
+            activityContent(snapshot)
         } else {
             emptyState
         }
     }
 
     @ViewBuilder
-    private func nutritionContent(_ data: NutritionSnapshot) -> some View {
-        // KPIs
-        NutritionKPIGrid(kpis: data.kpis)
+    private func activityContent(_ data: ActivitySnapshot) -> some View {
+
+        // ── Workouts section ──────────────────────────────────────────────────
+        sectionHeader("Workouts")
+
+        WorkoutKPIGrid(kpis: data.workoutKPIs)
 
         ChartSection(
-            title: "Macro Overview",
-            description: NutritionDescriptions.macroStackedBars
+            title: "Muscle Distribution",
+            description: ActivityDescriptions.muscleRadar(daysUsed: data.muscleRadar.daysUsed)
         ) {
-            MacroTargetBars(data: data.macroTargets, preferences: profileStore.preferences)
-        }
-
-        ChartSection(
-            title: "Daily Calories + Macros",
-            description: NutritionDescriptions.dailyCaloriesMacros
-        ) {
-            DailyCaloriesMacrosChart(data: data.dailyCaloriesMacros)
-        }
-
-        // Calorie Intake vs TDEE
-        if let balance = data.calorieBalance {
-            ChartSection(
-                title: "Calorie Intake vs TDEE",
-                description: NutritionDescriptions.calorieIntakeVsTDEE
-            ) {
-                CalorieBalanceChart(data: balance)
+            VStack(spacing: 0) {
+                MuscleRadarChart(data: data.muscleRadar)
+                MuscleRadarChart(data: data.muscleRadar).legendView
+                    .padding(.bottom, 8)
             }
         }
 
-        // Weight & Body Fat Trends
-        if let weights = data.weightTrends {
-            ChartSection(
-                title: "Weight & Body Fat Trends",
-                description: NutritionDescriptions.weightDualAxis
-            ) {
-                WeightTrendsChart(data: weights)
-            }
-        }
-
-        // Weekly Loss Rates
-        if let loss = data.weeklyLossRates {
-            ChartSection(
-                title: "Weekly Loss Rates",
-                description: NutritionDescriptions.weightLossRates
-            ) {
-                WeeklyLossRateChart(data: loss, preferences: profileStore.preferences)
-            }
-        }
-
-        // Pre & Post Workout Nutrition
-        let preDesc = NutritionDescriptions.preWorkoutNutritionTiming(avgWeightKg: data.avgWeightKg ?? 0)
         ChartSection(
-            title: "Pre-Workout Nutrition",
-            description: preDesc
+            title: "Volume Progression",
+            description: ActivityDescriptions.volumeProgression
         ) {
-            PreWorkoutChart(
-                points: data.preWorkout,
-                targets: data.preWorkoutTargets
-            )
+            VolumeProgressionChart(data: data.volumeProgression)
         }
+
+        // ── Activity section ──────────────────────────────────────────────────
+        sectionHeader("Activity")
+
+        ActivityKPIGrid(kpis: data.activityKPIs)
 
         ChartSection(
-            title: "Post-Workout Nutrition",
-            description: NutritionDescriptions.postWorkoutNutritionTiming
+            title: "Energy (TDEE)",
+            description: ActivityDescriptions.energyTDEE
         ) {
-            PostWorkoutChart(points: data.postWorkout)
+            EnergyTDEEChart(data: data.energyTDEE)
         }
+    }
+
+    // MARK: - Section header
+
+    private func sectionHeader(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.title2.bold())
+                .foregroundStyle(.white)
+            Spacer()
+        }
+        .padding(.top, 4)
     }
 
     // MARK: - States
 
     private var loadingState: some View {
-        LoadingView(message: "Computing nutrition data…")
+        LoadingView(message: "Computing activity data…")
     }
 
     private var emptyState: some View {
         VStack(spacing: 12) {
-            Image(systemName: "fork.knife")
+            Image(systemName: "figure.walk")
                 .font(.system(size: 48))
                 .foregroundStyle(accentCyan.opacity(0.5))
-            Text("No nutrition data")
+            Text("No activity data")
                 .font(.headline)
                 .foregroundStyle(.white.opacity(0.7))
-            Text("Sync your data from the Home tab\nto see nutrition insights.")
+            Text("Sync your data from the Home tab\nto see activity insights.")
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.4))
                 .multilineTextAlignment(.center)
@@ -237,10 +219,11 @@ struct NutritionView: View {
         snapshot = nil
         await Task.yield()
         let container = modelContext.container
-        let computer = NutritionComputer(modelContainer: container)
+        let targets = profileStore.preferences.muscleVolumeTargetsByRadarMuscle()
+        let computer = ActivityComputer(modelContainer: container)
         let start = Calendar.current.startOfDay(for: dateStart)
-        let end = Calendar.current.startOfDay(for: dateEnd)
-        snapshot = await computer.compute(dateStart: start, dateEnd: end)
+        let end   = Calendar.current.startOfDay(for: dateEnd)
+        snapshot = await computer.compute(dateStart: start, dateEnd: end, muscleTargets: targets)
         isLoading = false
     }
 }
