@@ -36,7 +36,7 @@ actor NutritionComputer {
     func compute(dateStart: Date, dateEnd: Date) -> NutritionSnapshot? {
         do {
             // Phase 1: NutritionEntry → lightweight structs, then release model objects
-            let macrosRaw: [MacroRow]
+            let macrosRaw: [NutritionMacroAggregate]
             let intakeRows: [IntakeRow]
             let nutritionLog: [NutritionLogRow]
             do {
@@ -51,8 +51,8 @@ actor NutritionComputer {
 
             // Phase 2: Scale data via GRDB SQL aggregation (GROUP BY date)
             let store = HealthRecordStore.shared
-            let scale: [ScaleRow] = try store.loadScale().map {
-                ScaleRow(date: $0.date, weightKg: $0.weightKg, fatPercent: $0.fatPercent)
+            let scale: [NutritionScaleAggregate] = try store.loadScale().map {
+                NutritionScaleAggregate(date: $0.date, weightKg: $0.weightKg, fatPercent: $0.fatPercent)
             }
 
             // Phase 3: TDEE via GRDB SQL aggregation (GROUP BY date, SUM)
@@ -69,11 +69,13 @@ actor NutritionComputer {
             }
 
             // Phase 5: Pure computation — mirrors Python: filter_macros(macros) then compute_macro_pct(filtered)
-            let macrosFilteredRaw = filterMacros(macrosRaw, dateStart: dateStart, dateEnd: dateEnd)
-            let macrosFilteredPct = computeMacroPct(macrosFilteredRaw)
+            let macrosFilteredRaw = NutritionKPIMath.filterMacros(macrosRaw, dateStart: dateStart, dateEnd: dateEnd)
+            let macrosFilteredPct = NutritionKPIMath.computeMacroPct(macrosFilteredRaw)
 
-            let kpis = computeKPIValues(macrosFilteredPct, scale: scale, dateStart: dateStart, dateEnd: dateEnd)
-            let macroTargets = computeMacroPctAverages(macrosFilteredPct)
+            let kpis = NutritionKPIMath.computeKPIValues(
+                macrosFilteredPct, scale: scale, dateStart: dateStart, dateEnd: dateEnd, calendar: Self.cal
+            )
+            let macroTargets = NutritionKPIMath.computeMacroPctAverages(macrosFilteredPct)
 
             let dailyMacros = prepareMacroKcalTimeseries(macrosFilteredPct)
             let calorieBalance = computeCalorieBalance(
@@ -112,23 +114,6 @@ actor NutritionComputer {
 
     // MARK: - Internal row types
 
-    private struct MacroRow {
-        let date: Date
-        var calories: Double
-        var proteinG: Double
-        var carbsG: Double
-        var fatG: Double
-        var protPct: Double?
-        var carbPct: Double?
-        var fatPct: Double?
-    }
-
-    private struct ScaleRow {
-        let date: Date
-        var weightKg: Double?
-        var fatPercent: Double?
-    }
-
     private struct IntakeRow {
         let date: Date
         var intakeKcal: Double
@@ -156,11 +141,11 @@ actor NutritionComputer {
 
     // MARK: - Loading (mirrors SQL queries in nutrition.py)
 
-    private func loadMacros(_ entries: [NutritionEntry]) -> [MacroRow] {
-        var byDate: [Date: MacroRow] = [:]
+    private func loadMacros(_ entries: [NutritionEntry]) -> [NutritionMacroAggregate] {
+        var byDate: [Date: NutritionMacroAggregate] = [:]
         for e in entries {
             guard let d = Self.dateFmt.date(from: e.date) else { continue }
-            var row = byDate[d] ?? MacroRow(date: d, calories: 0, proteinG: 0, carbsG: 0, fatG: 0)
+            var row = byDate[d] ?? NutritionMacroAggregate(date: d, calories: 0, proteinG: 0, carbsG: 0, fatG: 0)
             row.calories += e.energyKcal ?? 0
             row.proteinG += e.proteinG ?? 0
             row.carbsG += e.carbsG ?? 0
@@ -206,45 +191,9 @@ actor NutritionComputer {
         isoFmt.date(from: s) ?? isoFmtNoFrac.date(from: s)
     }
 
-    // MARK: - compute_macro_pct (lines 325-333)
-
-    private func computeMacroPct(_ rows: [MacroRow]) -> [MacroRow] {
-        rows.map { row in
-            var r = row
-            if row.calories > 0 {
-                r.protPct = (row.proteinG * NutritionConstants.proteinKcalPerGram / row.calories * 100).rounded(toPlaces: 1)
-                r.carbPct = (row.carbsG * NutritionConstants.carbsKcalPerGram / row.calories * 100).rounded(toPlaces: 1)
-                r.fatPct = (row.fatG * NutritionConstants.fatKcalPerGram / row.calories * 100).rounded(toPlaces: 1)
-            }
-            return r
-        }
-    }
-
-    // MARK: - filter_macros (line 585-586)
-    //
-    // Applied to **raw** daily totals (before compute_macro_pct), matching pandas order.
-
-    private func filterMacros(_ rows: [MacroRow], dateStart: Date, dateEnd: Date) -> [MacroRow] {
-        rows.filter { $0.date >= dateStart && $0.date <= dateEnd && $0.calories >= NutritionConstants.minCaloriesForFiltering }
-    }
-
-    // MARK: - compute_macro_pct_averages (lines 153-164)
-
-    private func computeMacroPctAverages(_ rows: [MacroRow]) -> MacroTargetData {
-        guard !rows.isEmpty else { return MacroTargetData(avgProteinPct: nil, avgCarbsPct: nil, avgFatPct: nil) }
-        let prots = rows.compactMap(\.protPct)
-        let carbs = rows.compactMap(\.carbPct)
-        let fats = rows.compactMap(\.fatPct)
-        return MacroTargetData(
-            avgProteinPct: prots.isEmpty ? nil : prots.mean(),
-            avgCarbsPct: carbs.isEmpty ? nil : carbs.mean(),
-            avgFatPct: fats.isEmpty ? nil : fats.mean()
-        )
-    }
-
     // MARK: - prepare_macro_kcal_timeseries (lines 167-184)
 
-    private func prepareMacroKcalTimeseries(_ rows: [MacroRow], rollingWindowDays: Int = 7) -> DailyCaloriesMacrosData {
+    private func prepareMacroKcalTimeseries(_ rows: [NutritionMacroAggregate], rollingWindowDays: Int = 7) -> DailyCaloriesMacrosData {
         guard !rows.isEmpty else { return DailyCaloriesMacrosData(points: [], effectiveDays: 0) }
         let sorted = rows.sorted { $0.date < $1.date }
         let kcals = sorted.map(\.calories)
@@ -267,47 +216,10 @@ actor NutritionComputer {
         return DailyCaloriesMacrosData(points: points, effectiveDays: effectiveDays)
     }
 
-    // MARK: - compute_kpi_values (lines 471-518)
-
-    private func computeKPIValues(_ macrosPct: [MacroRow], scale: [ScaleRow], dateStart: Date, dateEnd: Date) -> NutritionKPIs {
-        let macrosInRange = macrosPct.filter { $0.date >= dateStart && $0.date <= dateEnd }
-        let scaleInRange = scale.filter { $0.date >= dateStart && $0.date <= dateEnd && $0.weightKg != nil }
-            .sorted { $0.date < $1.date }
-
-        // Last 7 days within range
-        let last7Start = max(dateStart, Self.cal.date(byAdding: .day, value: -6, to: dateEnd)!)
-        let last7 = macrosInRange.filter { $0.date >= last7Start && $0.date <= dateEnd }
-        let avgCalories7d = last7.isEmpty ? 0.0 : last7.map(\.calories).mean()
-        let avgProtein7d = last7.isEmpty ? 0.0 : last7.map(\.proteinG).mean()
-
-        var bfChange: Double?
-        var wtChange: Double?
-
-        if !scaleInRange.isEmpty {
-            let bfRows = scaleInRange.filter { $0.fatPercent != nil }
-            if bfRows.count >= 2 {
-                bfChange = ((bfRows.last!.fatPercent! - bfRows.first!.fatPercent!) * 10).rounded() / 10
-            }
-            if scaleInRange.count >= 2 {
-                wtChange = ((scaleInRange.last!.weightKg! - scaleInRange.first!.weightKg!) * 10).rounded() / 10
-            }
-        }
-
-        let latestWeight = scaleInRange.last?.weightKg ?? 75.0
-        let proteinPerKg = latestWeight > 0 ? (avgProtein7d / latestWeight * 100).rounded() / 100 : 0
-
-        return NutritionKPIs(
-            last7dAvgKcal: avgCalories7d,
-            totalBodyFatChange: bfChange,
-            totalWeightChange: wtChange,
-            sevenDayProteinPerKg: proteinPerKg
-        )
-    }
-
     // MARK: - compute_calorie_balance (lines 336-387)
 
     private func computeCalorieBalance(
-        _ intakeRows: [IntakeRow], tdee tdeeRows: [TDEERow], scale scaleRows: [ScaleRow],
+        _ intakeRows: [IntakeRow], tdee tdeeRows: [TDEERow], scale scaleRows: [NutritionScaleAggregate],
         dateStart: Date, dateEnd: Date, minDate: Date
     ) -> CalorieBalanceData? {
         let intakeByDate = Dictionary(intakeRows.map { ($0.date, $0.intakeKcal) }, uniquingKeysWith: { $1 })
@@ -407,7 +319,7 @@ actor NutritionComputer {
 
     // MARK: - compute_scale_metrics (lines 390-405)
 
-    private func computeScaleMetrics(_ scale: [ScaleRow], dateStart: Date, dateEnd: Date) -> WeightTrendsData? {
+    private func computeScaleMetrics(_ scale: [NutritionScaleAggregate], dateStart: Date, dateEnd: Date) -> WeightTrendsData? {
         let filtered = scale.filter { $0.date >= dateStart && $0.date <= dateEnd }.sorted { $0.date < $1.date }
         guard !filtered.isEmpty else { return nil }
 
@@ -437,7 +349,7 @@ actor NutritionComputer {
 
     // MARK: - compute_weekly_loss_rates (lines 408-421)
 
-    private func computeWeeklyLossRates(_ scale: [ScaleRow], dateStart: Date, dateEnd: Date) -> WeeklyLossRateData? {
+    private func computeWeeklyLossRates(_ scale: [NutritionScaleAggregate], dateStart: Date, dateEnd: Date) -> WeeklyLossRateData? {
         let filtered = scale.filter { $0.date >= dateStart && $0.date <= dateEnd }.sorted { $0.date < $1.date }
         guard filtered.count >= 2 else { return nil }
 
@@ -544,7 +456,7 @@ actor NutritionComputer {
 
     // MARK: - compute_avg_weight_kg (lines 257-261)
 
-    private func computeAvgWeightKg(_ scale: [ScaleRow]) -> Double? {
+    private func computeAvgWeightKg(_ scale: [NutritionScaleAggregate]) -> Double? {
         let weights = scale.compactMap(\.weightKg)
         guard !weights.isEmpty else { return nil }
         return weights.mean()
@@ -673,9 +585,3 @@ private extension Array where Element == Double {
     }
 }
 
-private extension Double {
-    func rounded(toPlaces places: Int) -> Double {
-        let multiplier = pow(10, Double(places))
-        return (self * multiplier).rounded() / multiplier
-    }
-}

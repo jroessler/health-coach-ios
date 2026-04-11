@@ -27,7 +27,7 @@ struct NutritionKPIGrid: View {
             )
             KPICard(
                 label: "7d avg Protein/kg",
-                value: String(format: "%.2fg/kg", kpis.sevenDayProteinPerKg),
+                value: formatProteinPerKg(kpis.sevenDayProteinPerKg),
                 accentColor: proteinColor(kpis.sevenDayProteinPerKg)
             )
         }
@@ -43,9 +43,15 @@ struct NutritionKPIGrid: View {
         return v < 0 ? .kpiGood : .kpiBad
     }
 
-    private func proteinColor(_ value: Double) -> Color {
-        if value >= 1.8 { return .kpiGood }
-        if value >= 1.4 { return .kpiBad }
+    private func formatProteinPerKg(_ value: Double?) -> String {
+        guard let v = value else { return "--" }
+        return String(format: "%.2fg/kg", v)
+    }
+
+    private func proteinColor(_ value: Double?) -> Color {
+        guard let v = value else { return .kpiNeutral }
+        if v >= 1.8 { return .kpiGood }
+        if v >= 1.4 { return .kpiBad }
         return .kpiBad
     }
 }

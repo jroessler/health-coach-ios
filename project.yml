@@ -39,3 +39,16 @@ targets:
       path: HealthCoach/HealthCoach.entitlements
       properties:
         com.apple.developer.healthkit: true
+
+  HealthCoachTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - HealthCoachTests
+    dependencies:
+      - target: HealthCoach
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        SWIFT_VERSION: "5.9"
+        PRODUCT_BUNDLE_IDENTIFIER: com.jannik.healthcoach.tests

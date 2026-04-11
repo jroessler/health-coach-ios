@@ -22,7 +22,8 @@ struct NutritionKPIs: Sendable {
     let last7dAvgKcal: Double
     let totalBodyFatChange: Double?
     let totalWeightChange: Double?
-    let sevenDayProteinPerKg: Double
+    /// `nil` when no usable body weight (none in range and none before the range).
+    let sevenDayProteinPerKg: Double?
 }
 
 // MARK: - Macro Target Distribution
