@@ -3,26 +3,29 @@ import Security
 
 final class KeychainService {
     static let shared = KeychainService()
-    private let serviceKey = "com.jannik.healthcoach.hevy-api-key"
+    private let hevyServiceKey = "com.jannik.healthcoach.hevy-api-key"
+    private let anthropicServiceKey = "com.jannik.healthcoach.anthropic-api-key"
 
     private init() {}
 
-    func save(apiKey: String) -> Bool {
-        guard let data = apiKey.data(using: .utf8) else { return false }
-        delete()
+    // MARK: - Generic helpers
+
+    private func save(_ value: String, forService service: String) -> Bool {
+        guard let data = value.data(using: .utf8) else { return false }
+        delete(forService: service)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceKey,
+            kSecAttrService as String: service,
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
         ]
         return SecItemAdd(query as CFDictionary, nil) == errSecSuccess
     }
 
-    func retrieve() -> String? {
+    private func retrieve(forService service: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceKey,
+            kSecAttrService as String: service,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
@@ -33,11 +36,42 @@ final class KeychainService {
     }
 
     @discardableResult
-    func delete() -> Bool {
+    private func delete(forService service: String) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceKey,
+            kSecAttrService as String: service,
         ]
         return SecItemDelete(query as CFDictionary) == errSecSuccess
+    }
+
+    // MARK: - Hevy API Key
+
+    func save(apiKey: String) -> Bool {
+        save(apiKey, forService: hevyServiceKey)
+    }
+
+    func retrieve() -> String? {
+        retrieve(forService: hevyServiceKey)
+    }
+
+    @discardableResult
+    func delete() -> Bool {
+        delete(forService: hevyServiceKey)
+    }
+
+    // MARK: - Anthropic API Key
+
+    @discardableResult
+    func saveAnthropicKey(_ key: String) -> Bool {
+        save(key, forService: anthropicServiceKey)
+    }
+
+    func retrieveAnthropicKey() -> String? {
+        retrieve(forService: anthropicServiceKey)
+    }
+
+    @discardableResult
+    func deleteAnthropicKey() -> Bool {
+        delete(forService: anthropicServiceKey)
     }
 }

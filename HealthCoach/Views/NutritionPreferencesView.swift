@@ -72,26 +72,6 @@ struct NutritionPreferencesView: View {
             }
 
             Section {
-                Stepper(value: $draft.fiberTargetG, in: 10...80, step: 1) {
-                    HStack {
-                        Text("Fiber target (g/day)")
-                        Spacer()
-                        Text("\(draft.fiberTargetG)")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .listRowBackground(cardBg)
-
-                Stepper(value: $draft.sugarLimitG, in: 20...150, step: 1) {
-                    HStack {
-                        Text("Sugar limit (g/day)")
-                        Spacer()
-                        Text("\(draft.sugarLimitG)")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .listRowBackground(cardBg)
-
                 Stepper(value: $draft.weeklyWeightLossTargetKg, in: -2.0...0.0, step: 0.1) {
                     HStack {
                         Text("Weekly weight loss (kg/wk)")
@@ -112,7 +92,7 @@ struct NutritionPreferencesView: View {
                 }
                 .listRowBackground(cardBg)
             } header: {
-                Text("Other nutrition targets")
+                Text("Loss targets")
             } footer: {
                 Text("Weekly targets are negative during a cut (loss).")
             }

@@ -9,6 +9,9 @@ struct SettingsView: View {
     @State private var apiKeyInput = ""
     @State private var isKeyVisible = false
     @State private var keySaved = false
+    @State private var anthropicKeyInput = ""
+    @State private var isAnthropicKeyVisible = false
+    @State private var anthropicKeySaved = false
     @State private var healthKitAuthorized = false
 
     private let bgColor = Color(hex: 0x02161C)
@@ -20,6 +23,7 @@ struct SettingsView: View {
             List {
                 profileSection
                 hevySection
+                aiCoachSection
                 healthKitSection
                 syncSection
                 dataSection
@@ -40,6 +44,9 @@ struct SettingsView: View {
             .onAppear {
                 if let existing = KeychainService.shared.retrieve() {
                     apiKeyInput = existing
+                }
+                if let existing = KeychainService.shared.retrieveAnthropicKey() {
+                    anthropicKeyInput = existing
                 }
                 healthKitAuthorized = HKHealthStore.isHealthDataAvailable()
             }
@@ -118,6 +125,50 @@ struct SettingsView: View {
             Text("Hevy")
         } footer: {
             Text("Your API key is stored securely in the iOS Keychain.")
+        }
+    }
+
+    // MARK: - AI Coach API Key
+
+    private var aiCoachSection: some View {
+        Section {
+            HStack {
+                Group {
+                    if isAnthropicKeyVisible {
+                        TextField("Anthropic API Key", text: $anthropicKeyInput)
+                    } else {
+                        SecureField("Anthropic API Key", text: $anthropicKeyInput)
+                    }
+                }
+                .textContentType(.password)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+
+                Button {
+                    isAnthropicKeyVisible.toggle()
+                } label: {
+                    Image(systemName: isAnthropicKeyVisible ? "eye.slash" : "eye")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .listRowBackground(cardBg)
+
+            Button {
+                let success = KeychainService.shared.saveAnthropicKey(anthropicKeyInput)
+                anthropicKeySaved = success
+            } label: {
+                HStack {
+                    Image(systemName: anthropicKeySaved ? "checkmark.circle.fill" : "key.fill")
+                    Text(anthropicKeySaved ? "Key Saved" : "Save API Key")
+                }
+                .foregroundStyle(anthropicKeySaved ? .green : accentCyan)
+            }
+            .listRowBackground(cardBg)
+        } header: {
+            Text("AI Coach")
+        } footer: {
+            Text("Your Anthropic API key is stored securely in the iOS Keychain. Required for the AI Coach tab.")
         }
     }
 

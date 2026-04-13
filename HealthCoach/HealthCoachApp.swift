@@ -18,6 +18,7 @@ struct HealthCoachApp: App {
             Workout.self,
             WorkoutSet.self,
             ExerciseTemplate.self,
+            CoachSummary.self,
         ])
     }
 }
@@ -38,6 +39,10 @@ struct ContentView: View {
             ActivityView()
                 .tabItem {
                     Label("Activity", systemImage: "figure.walk")
+                }
+            AISummaryView()
+                .tabItem {
+                    Label("Coach", systemImage: "sparkles")
                 }
         }
         .toolbarBackground(tabBarBg, for: .tabBar)
