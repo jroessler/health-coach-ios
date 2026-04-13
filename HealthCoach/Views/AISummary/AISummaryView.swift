@@ -1,9 +1,26 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - CoachTabView (top-level Coach tab)
+
+struct CoachTabView: View {
+    @State private var selectedTab = 0
+
+    private let bgColor    = Color(hex: 0x02161C)
+    private let accentCyan = Color(hex: 0x22D3EE)
+
+    var body: some View {
+        AISummaryView(selectedTab: $selectedTab)
+    }
+}
+
+// MARK: - AISummaryView (inner view — handles both Summaries and Chat tabs)
+
 struct AISummaryView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(UserProfileStore.self) private var profileStore
+
+    @Binding var selectedTab: Int
 
     @State private var shortTermDays = 14
     @State private var longTermDays  = 60
@@ -19,26 +36,42 @@ struct AISummaryView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    configCard
-                    generateButton
-                    resultArea
+            ZStack(alignment: .top) {
+                bgColor.ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    // Segmented picker pinned below nav bar
+                    Picker("Coach Mode", selection: $selectedTab) {
+                        Text("Summaries").tag(0)
+                        Text("Chat").tag(1)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(bgColor)
+
+                    Divider()
+                        .background(Color.white.opacity(0.08))
+
+                    if selectedTab == 0 {
+                        summariesContent
+                    } else {
+                        CoachChatListView()
+                    }
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 96)
             }
-            .background(bgColor.ignoresSafeArea())
             .navigationTitle("AI Coach")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(bgColor, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { showHistory = true } label: {
-                        Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                            .foregroundStyle(accentCyan)
+                if selectedTab == 0 {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button { showHistory = true } label: {
+                            Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                                .foregroundStyle(accentCyan)
+                        }
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -50,6 +83,20 @@ struct AISummaryView: View {
             }
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showHistory)  { SummaryHistoryView() }
+        }
+    }
+
+    // MARK: - Summaries content
+
+    private var summariesContent: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                configCard
+                generateButton
+                resultArea
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 96)
         }
     }
 

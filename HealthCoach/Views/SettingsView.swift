@@ -13,6 +13,9 @@ struct SettingsView: View {
     @State private var isAnthropicKeyVisible = false
     @State private var anthropicKeySaved = false
     @State private var healthKitAuthorized = false
+    @State private var weeklyCoachReminderEnabled = UserDefaults.standard.bool(
+        forKey: CoachWeeklyReminderService.enabledKey
+    )
 
     private let bgColor = Color(hex: 0x02161C)
     private let cardBg = Color(hex: 0x0A1A24)
@@ -24,6 +27,7 @@ struct SettingsView: View {
                 profileSection
                 hevySection
                 aiCoachSection
+                weeklyReminderSection
                 healthKitSection
                 syncSection
                 dataSection
@@ -49,6 +53,7 @@ struct SettingsView: View {
                     anthropicKeyInput = existing
                 }
                 healthKitAuthorized = HKHealthStore.isHealthDataAvailable()
+                weeklyCoachReminderEnabled = UserDefaults.standard.bool(forKey: CoachWeeklyReminderService.enabledKey)
             }
         }
     }
@@ -169,6 +174,29 @@ struct SettingsView: View {
             Text("AI Coach")
         } footer: {
             Text("Your Anthropic API key is stored securely in the iOS Keychain. Required for the AI Coach tab.")
+        }
+    }
+
+    // MARK: - Weekly reminder
+
+    private var weeklyReminderSection: some View {
+        Section {
+            Toggle(isOn: $weeklyCoachReminderEnabled) {
+                Label("Weekly summary reminder", systemImage: "bell.badge")
+            }
+            .onChange(of: weeklyCoachReminderEnabled) { _, new in
+                Task { @MainActor in
+                    let applied = await CoachWeeklyReminderService.setReminderEnabled(new)
+                    if applied != new {
+                        weeklyCoachReminderEnabled = applied
+                    }
+                }
+            }
+            .listRowBackground(cardBg)
+        } header: {
+            Text("Reminders")
+        } footer: {
+            Text("Sundays at 10:00. Tap the notification to open the Coach tab.")
         }
     }
 

@@ -215,6 +215,38 @@ struct CoachSnapshotBuilder {
         return f
     }()
 
+    /// Builds only the user profile and targets structs from settings — no async work required.
+    /// Used by the chat feature to construct the system prompt using current profile data
+    /// while the actual health snapshot remains frozen from when the conversation was started.
+    static func buildProfileAndTargets(
+        settings: UserSettings,
+        preferences: UserPreferences
+    ) -> (profile: CoachUserProfile, targets: CoachTargets) {
+        let muscleTargets = preferences.muscleVolumeTargetsByRadarMuscle()
+        let profile = CoachUserProfile(
+            age: settings.age,
+            heightCm: settings.heightCm,
+            gender: settings.gender,
+            trainingExperience: settings.trainingExperience,
+            dietPhase: settings.dietPhase
+        )
+        let targets = CoachTargets(
+            proteinPct: preferences.targetProteinPct,
+            carbsPct: preferences.targetCarbsPct,
+            fatPct: preferences.targetFatPct,
+            proteinMealTargetG: NutritionConstants.proteinMealTargetG,
+            proteinPostWorkoutTargetG: NutritionConstants.proteinPostWorkoutTargetG,
+            weeklyWeightLossTargetKg: preferences.weeklyWeightLossTargetKg,
+            weeklyBodyfatLossTargetPct: preferences.weeklyBodyfatLossTargetPct,
+            stepsGoal: ActivityConstants.stepsGoal,
+            standGoalMin: ActivityConstants.standGoalMin,
+            activeKcalTarget: ActivityConstants.activeKcalTarget,
+            vo2LongevityGoal: HeartConstants.vo2LongevityGoal,
+            muscleSetTargets: muscleTargets
+        )
+        return (profile: profile, targets: targets)
+    }
+
     static func build(
         shortTermDays: Int,
         longTermDays: Int,

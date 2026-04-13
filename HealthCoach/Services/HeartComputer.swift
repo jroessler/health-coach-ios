@@ -133,10 +133,9 @@ actor HeartComputer {
             )
 
             // Compute KPIs
-            let recoveryKPIs = computeRecoveryKPIs(
-                hrv: hrvChart,
-                rhr: rhrChart,
-                periodLength: periodLength
+            let recoveryKPIs = HeartKPIMath.computeRecoveryKPIs(
+                hrvPoints: hrvChart.points,
+                rhrPoints: rhrChart.points
             )
             let (refs, ageLabel) = HeartConstants.vo2Refs(forAge: userAge)
             let fitnessKPIs = computeFitnessKPIs(
@@ -212,7 +211,7 @@ actor HeartComputer {
         }.sorted { $0.date < $1.date }
 
         // hrv_7d = rolling(7, min_periods=1).mean on display range
-        let hrv7d = leftRollingMean(dailyPoints.map(\.value), window: 7, minPeriods: 1)
+        let hrv7d = HeartKPIMath.leftRollingMean(dailyPoints.map(\.value), window: 7, minPeriods: 1)
 
         // Baseline: daily avg across extended range
         var baselineByDate: [Date: [Double]] = [:]
@@ -225,8 +224,8 @@ actor HeartComputer {
 
         let baselineVals = baselineDailyPoints.map(\.value)
         // rolling(30, min_periods=7).mean and .std on baseline points
-        let baselineMeans = leftRollingMean(baselineVals, window: 30, minPeriods: 7)
-        let baselineSDs = leftRollingStd(baselineVals, window: 30, minPeriods: 7, fillZero: true)
+        let baselineMeans = HeartKPIMath.leftRollingMean(baselineVals, window: 30, minPeriods: 7)
+        let baselineSDs = HeartKPIMath.leftRollingStd(baselineVals, window: 30, minPeriods: 7, fillZero: true)
 
         // Build lookup by date from baseline
         var baselineLookup: [Date: (mean: Double?, sd: Double)] = [:]
@@ -243,7 +242,7 @@ actor HeartComputer {
             let lower = baseline.map { $0 - sd }
             let lower2 = baseline.map { $0 - 2 * sd }
             let pctDev: Double? = baseline.flatMap { b in
-                b > 0 ? ((dp.value - b) / b * 100).rounded(to: 1) : 0
+                b > 0 ? HeartKPIMath.rounded((dp.value - b) / b * 100, decimals: 1) : 0
             }
             return HRVDayPoint(
                 date: dp.date,
@@ -301,7 +300,7 @@ actor HeartComputer {
             DailyValue(date: date, value: values.reduce(0, +) / Double(values.count))
         }.sorted { $0.date < $1.date }
 
-        let rhr7d = leftRollingMean(dailyPoints.map(\.value), window: 7, minPeriods: 1)
+        let rhr7d = HeartKPIMath.leftRollingMean(dailyPoints.map(\.value), window: 7, minPeriods: 1)
 
         // Baseline
         var baselineByDate: [Date: [Double]] = [:]
@@ -311,8 +310,8 @@ actor HeartComputer {
         }.sorted { $0.date < $1.date }
 
         let baselineVals = baselineDailyPoints.map(\.value)
-        let baselineMeans = leftRollingMean(baselineVals, window: 30, minPeriods: 7)
-        let baselineSDs = leftRollingStd(baselineVals, window: 30, minPeriods: 7, fillZero: true)
+        let baselineMeans = HeartKPIMath.leftRollingMean(baselineVals, window: 30, minPeriods: 7)
+        let baselineSDs = HeartKPIMath.leftRollingStd(baselineVals, window: 30, minPeriods: 7, fillZero: true)
 
         var baselineLookup: [Date: (mean: Double?, sd: Double)] = [:]
         for (i, bp) in baselineDailyPoints.enumerated() {
@@ -382,7 +381,7 @@ actor HeartComputer {
         }.sorted { $0.date < $1.date }
 
         // vo2_14d = rolling(14, min_periods=1).mean
-        let vo214d = leftRollingMean(dailyPoints.map(\.value), window: 14, minPeriods: 1)
+        let vo214d = HeartKPIMath.leftRollingMean(dailyPoints.map(\.value), window: 14, minPeriods: 1)
 
         // Baseline (extended range): rolling(30, min_periods=1).mean
         var baselineByDate: [Date: [Double]] = [:]
@@ -391,7 +390,7 @@ actor HeartComputer {
             DailyValue(date: date, value: values.reduce(0, +) / Double(values.count))
         }.sorted { $0.date < $1.date }
 
-        let baselineMeans = leftRollingMean(baselineDailyPoints.map(\.value), window: 30, minPeriods: 1)
+        let baselineMeans = HeartKPIMath.leftRollingMean(baselineDailyPoints.map(\.value), window: 30, minPeriods: 1)
 
         var baselineLookup: [Date: Double?] = [:]
         for (i, bp) in baselineDailyPoints.enumerated() {
@@ -432,7 +431,7 @@ actor HeartComputer {
             return DailyValue(date: row.date, value: w)
         }.sorted { $0.date < $1.date }
 
-        let weight7d = leftRollingMean(weightFiltered.map(\.value), window: 7, minPeriods: 1)
+        let weight7d = HeartKPIMath.leftRollingMean(weightFiltered.map(\.value), window: 7, minPeriods: 1)
 
         // Build weight lookup (date → 7d rolling avg)
         var weightLookup: [Date: (raw: Double, rolling: Double?)] = [:]
@@ -451,8 +450,8 @@ actor HeartComputer {
         // Ffill weight_7d and vo2_baseline across all dates
         var weight7dSeries: [Double?] = sortedDates.map { weightLookup[$0]?.rolling }
         var vo2BaselineSeries: [Double?] = sortedDates.map { vo2Lookup[$0]?.baseline }
-        ffill(&weight7dSeries)
-        ffill(&vo2BaselineSeries)
+        HeartKPIMath.forwardFill(&weight7dSeries)
+        HeartKPIMath.forwardFill(&vo2BaselineSeries)
 
         let vo2AbsSeries: [Double?] = sortedDates.enumerated().map { (i, date) in
             guard let vo2 = vo2Lookup[date]?.max, let wt = weight7dSeries[i] else { return nil }
@@ -460,7 +459,7 @@ actor HeartComputer {
         }
 
         // vo2_absolute_14d = rolling(14, min_periods=1).mean on absolute series
-        let vo2Abs14dRaw = leftRollingMeanOptional(vo2AbsSeries, window: 14, minPeriods: 1)
+        let vo2Abs14dRaw = HeartKPIMath.leftRollingMeanOptional(vo2AbsSeries, window: 14, minPeriods: 1)
 
         let points: [VO2WeightPoint] = sortedDates.enumerated().map { (i, date) in
             VO2WeightPoint(
@@ -479,77 +478,6 @@ actor HeartComputer {
     }
 
     // MARK: - compute_heart_kpis (mirrors heart.py compute_heart_kpis exactly)
-
-    private func computeRecoveryKPIs(
-        hrv: HRVComputeResult,
-        rhr: RHRComputeResult,
-        periodLength: Int
-    ) -> RecoveryKPIs {
-        let defaultKPIs = RecoveryKPIs(
-            recoveryScore: 50,
-            hrvToday: 0, hrvBaseline: 0, hrvPct: 0, hrvZ: 0,
-            rhrToday: 0, rhrBaseline: 0, rhrPct: 0, rhrZ: 0,
-            divergence: 0, divergenceLabel: "Neutral", divergenceDetail: "No clear signal"
-        )
-
-        guard !hrv.points.isEmpty, !rhr.points.isEmpty else { return defaultKPIs }
-
-        // hrv_valid = dropna(hrv_ms)
-        // hrv_last7_mean = hrv_valid.tail(7)["hrv_ms"].mean()  — Python always uses .tail(7),
-        // regardless of period length. min(7, period_length) is only for display labels.
-        let hrvValid = hrv.points
-        let hrvLast7Mean = hrvValid.suffix(7).map(\.hrv).mean()
-        let latestHRV = hrvValid.last!
-
-        let latestBaselineHRV = latestHRV.baseline ?? 0
-        let latestSD_HRV = latestHRV.sd
-        let hrvZ = latestSD_HRV > 0 ? (hrvLast7Mean - latestBaselineHRV) / latestSD_HRV : 0
-        let hrvPct: Double = latestBaselineHRV > 0 ? ((hrvLast7Mean - latestBaselineHRV) / latestBaselineHRV * 100).rounded(to: 1) : 0
-
-        // RHR — same pattern: rhr_last7_mean = rhr_valid.tail(7)["rhr_bpm"].mean()
-        let rhrValid = rhr.points
-        let rhrLast7Mean = rhrValid.suffix(7).map(\.rhr).mean()
-        let latestRHR = rhrValid.last!
-        let latestBaselineRHR = latestRHR.baseline ?? 0
-        let latestSD_RHR = latestRHR.sd
-
-        // rhr_z = (baseline - last7_mean) / sd  (inverted: lower RHR = positive z)
-        let rhrZ = latestSD_RHR > 0 ? (latestBaselineRHR - rhrLast7Mean) / latestSD_RHR : 0
-        let rhrPct: Double = latestBaselineRHR > 0 ? ((rhrLast7Mean - latestBaselineRHR) / latestBaselineRHR * 100).rounded(to: 1) : 0
-
-        // recovery_score = clamp(0, 100, round(50 + (hrv_z + rhr_z) / 2 * 25))
-        let recoveryRaw = (hrvZ + rhrZ) / 2
-        let recoveryScore = Int(max(0, min(100, (50 + recoveryRaw * 25).rounded())))
-
-        // divergence = hrv_z - rhr_z_raw (rhr_z_raw uses raw sign, not inverted)
-        let rhrZRaw = latestSD_RHR > 0 ? (rhrLast7Mean - latestBaselineRHR) / latestSD_RHR : 0
-        let divergence = hrvZ - rhrZRaw
-
-        let (divergenceLabel, divergenceDetail) = divergenceSignal(divergence)
-
-        return RecoveryKPIs(
-            recoveryScore: recoveryScore,
-            hrvToday: hrvLast7Mean,
-            hrvBaseline: latestBaselineHRV,
-            hrvPct: hrvPct,
-            hrvZ: hrvZ,
-            rhrToday: rhrLast7Mean,
-            rhrBaseline: latestBaselineRHR,
-            rhrPct: rhrPct,
-            rhrZ: rhrZ,
-            divergence: divergence,
-            divergenceLabel: divergenceLabel,
-            divergenceDetail: divergenceDetail
-        )
-    }
-
-    private func divergenceSignal(_ divergence: Double) -> (String, String) {
-        if divergence >= 1.0 { return ("Optimal", "HRV↑ · RHR↓") }
-        if divergence >= 0.25 { return ("Aligned", "HRV↑ · RHR↓") }
-        if divergence >= -0.25 { return ("Neutral", "No clear signal") }
-        if divergence >= -1.0 { return ("Diverging", "HRV↓ · RHR↑") }
-        return ("Stressed", "HRV↓ · RHR↑")
-    }
 
     private func computeFitnessKPIs(
         vo2: VO2ComputeResult,
@@ -570,13 +498,10 @@ actor HeartComputer {
         let vo2Current = vo2.points.last?.vo2Max
 
         // vo2_delta_30d = vo2_baseline.last - vo2_14d.last  (mirrors 3_Heart.py lines 481-482)
-        let vo2Delta30d: Double?
-        if let lastBaseline = vo2.points.last?.baseline,
-           let last14d = vo2.points.last?.vo214d {
-            vo2Delta30d = lastBaseline - last14d
-        } else {
-            vo2Delta30d = nil
-        }
+        let vo2Delta30d = HeartKPIMath.vo2Delta30d(
+            lastBaseline: vo2.points.last?.baseline,
+            last14d: vo2.points.last?.vo214d
+        )
 
         return FitnessKPIs(vo2Current: vo2Current, vo2Delta30d: vo2Delta30d, vo2AgeRefs: vo2AgeRefs)
     }
@@ -612,19 +537,14 @@ actor HeartComputer {
         // lagged_volume = max(vol_lag1, vol_lag2)
         let avgPeriod = min(7, periodLength)
         let hrvValues: [Double?] = allDates.map { hrvDaily[$0] }
-        let hrv7d = leftRollingMeanOptional(hrvValues, window: 7, minPeriods: 1)
+        let hrv7d = HeartKPIMath.leftRollingMeanOptional(hrvValues, window: 7, minPeriods: 1)
 
         let points: [HRVVolumePoint] = allDates.enumerated().compactMap { (i, date) in
             let lag1Date = Self.cal.date(byAdding: .day, value: -1, to: date)!
             let lag2Date = Self.cal.date(byAdding: .day, value: -2, to: date)!
             let volLag1 = volumeByDate[lag1Date]
             let volLag2 = volumeByDate[lag2Date]
-            let laggedVolume: Double? = switch (volLag1, volLag2) {
-            case let (v1?, v2?): max(v1, v2)
-            case let (v1?, nil): v1
-            case let (nil, v2?): v2
-            default: nil
-            }
+            let laggedVolume = HeartKPIMath.laggedTrainingVolume(volLag1: volLag1, volLag2: volLag2)
 
             guard hrvValues[i] != nil || laggedVolume != nil else { return nil }
 
@@ -671,8 +591,8 @@ actor HeartComputer {
         let dateEndNorm = Self.startOfDay(dateEnd)
 
         let hrvValues = combined.map(\.hrv)
-        let p33 = percentile(hrvValues, p: 0.33)
-        let p66 = percentile(hrvValues, p: 0.66)
+        let p33 = HeartKPIMath.percentile(hrvValues, p: 0.33)
+        let p66 = HeartKPIMath.percentile(hrvValues, p: 0.66)
 
         // Zone assignment
         let inRange = combined.filter { $0.date >= dateStartNorm && $0.date <= dateEndNorm }
@@ -687,12 +607,12 @@ actor HeartComputer {
         }
 
         // Zone averages
-        let lowAvg = points.filter { $0.zone == .low }.map(\.volume).mean()
-        let modAvg = points.filter { $0.zone == .moderate }.map(\.volume).mean()
-        let highAvg = points.filter { $0.zone == .high }.map(\.volume).mean()
+        let lowAvg = HeartKPIMath.mean(points.filter { $0.zone == .low }.map(\.volume))
+        let modAvg = HeartKPIMath.mean(points.filter { $0.zone == .moderate }.map(\.volume))
+        let highAvg = HeartKPIMath.mean(points.filter { $0.zone == .high }.map(\.volume))
 
         // Linear regression (least squares)
-        let (slope, intercept) = linearRegression(
+        let (slope, intercept) = HeartKPIMath.linearRegression(
             x: points.map(\.hrv),
             y: points.map(\.volume)
         )
@@ -740,7 +660,7 @@ actor HeartComputer {
     private func dailyAvgFromHRV(_ records: [HRVRow]) -> [Date: Double] {
         var byDate: [Date: [Double]] = [:]
         for r in records { byDate[r.date, default: []].append(r.hrv) }
-        return byDate.mapValues { $0.mean() }
+        return byDate.mapValues { HeartKPIMath.mean($0) }
     }
 
     private static func parseDateTime(_ s: String) -> Date? {
@@ -749,94 +669,5 @@ actor HeartComputer {
 
     private static func startOfDay(_ date: Date) -> Date {
         cal.startOfDay(for: date)
-    }
-
-    // MARK: - Rolling window helpers
-
-    /// Left-aligned rolling mean (pandas default, min_periods support).
-    /// Mirrors pandas Series.rolling(window, min_periods=mp).mean()
-    private func leftRollingMean(_ values: [Double], window: Int, minPeriods: Int) -> [Double?] {
-        let n = values.count
-        return (0..<n).map { i in
-            let start = max(0, i - window + 1)
-            let slice = Array(values[start...i])
-            return slice.count >= minPeriods ? slice.reduce(0, +) / Double(slice.count) : nil
-        }
-    }
-
-    /// Left-aligned rolling mean for optional values (skips nils).
-    private func leftRollingMeanOptional(_ values: [Double?], window: Int, minPeriods: Int) -> [Double?] {
-        let n = values.count
-        return (0..<n).map { i in
-            let start = max(0, i - window + 1)
-            let slice = values[start...i].compactMap { $0 }
-            return slice.count >= minPeriods ? slice.reduce(0, +) / Double(slice.count) : nil
-        }
-    }
-
-    /// Left-aligned rolling std.
-    /// Mirrors pandas Series.rolling(window, min_periods=mp).std() (ddof=1).
-    /// fillZero: if true returns 0 when std is nil (mirrors .fillna(0) in heart.py).
-    private func leftRollingStd(_ values: [Double], window: Int, minPeriods: Int, fillZero: Bool) -> [Double?] {
-        let n = values.count
-        return (0..<n).map { i in
-            let start = max(0, i - window + 1)
-            let slice = Array(values[start...i])
-            if slice.count < max(minPeriods, 2) {
-                return fillZero ? 0 : nil
-            }
-            let mean = slice.reduce(0, +) / Double(slice.count)
-            let variance = slice.map { ($0 - mean) * ($0 - mean) }.reduce(0, +) / Double(slice.count - 1)
-            let std = sqrt(variance)
-            return fillZero ? std : std
-        }
-    }
-
-    /// Forward-fill nils.
-    private func ffill(_ arr: inout [Double?]) {
-        for i in 1..<arr.count {
-            if arr[i] == nil { arr[i] = arr[i - 1] }
-        }
-    }
-
-    // MARK: - Statistical helpers
-
-    private func percentile(_ values: [Double], p: Double) -> Double {
-        guard !values.isEmpty else { return 0 }
-        let sorted = values.sorted()
-        let index = p * Double(sorted.count - 1)
-        let lo = Int(floor(index))
-        let hi = min(lo + 1, sorted.count - 1)
-        let fraction = index - Double(lo)
-        return sorted[lo] * (1 - fraction) + sorted[hi] * fraction
-    }
-
-    /// Ordinary least squares: returns (slope, intercept).
-    private func linearRegression(x: [Double], y: [Double]) -> (slope: Double, intercept: Double) {
-        guard x.count == y.count, x.count >= 2 else { return (0, 0) }
-        let xMean = x.mean()
-        let yMean = y.mean()
-        let numerator = zip(x, y).map { ($0 - xMean) * ($1 - yMean) }.reduce(0, +)
-        let denominator = x.map { ($0 - xMean) * ($0 - xMean) }.reduce(0, +)
-        guard denominator > 0 else { return (0, yMean) }
-        let slope = numerator / denominator
-        let intercept = yMean - slope * xMean
-        return (slope, intercept)
-    }
-}
-
-// MARK: - Array helpers
-
-private extension Array where Element == Double {
-    func mean() -> Double {
-        guard !isEmpty else { return 0 }
-        return reduce(0, +) / Double(count)
-    }
-}
-
-private extension Double {
-    func rounded(to decimals: Int) -> Double {
-        let factor = pow(10.0, Double(decimals))
-        return (self * factor).rounded() / factor
     }
 }
