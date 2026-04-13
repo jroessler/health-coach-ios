@@ -33,8 +33,8 @@ struct WorkoutKPIGrid: View {
 
             WorkoutKPICard(
                 label: "Avg Duration (Last \(kpis.priorDays)d)",
-                value: "\(Int(kpis.avgDurationPriorMin)) min",
-                subtitle: deltaLabel(kpis.deltaDurationMin, format: "%.0f", unit: "min vs overall"),
+                value: "\(Int(kpis.avgDurationLastNMin)) min",
+                subtitle: deltaLabel(kpis.deltaDurationMin, format: "%.0f", unit: "min vs prior"),
                 accentColor: kpiColor(kpis.deltaDurationMin, positiveIsGood: true)
             )
         }

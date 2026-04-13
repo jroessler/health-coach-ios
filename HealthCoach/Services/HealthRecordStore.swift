@@ -234,6 +234,76 @@ final class HealthRecordStore: Sendable {
         }
     }
 
+    // MARK: - Heart queries
+
+    struct HRVRecord: Sendable {
+        let date: Date
+        let hrvMs: Double
+        let startDateStr: String?
+    }
+
+    struct RHRRecord: Sendable {
+        let date: Date
+        let rhrBpm: Double
+    }
+
+    struct VO2Record: Sendable {
+        let date: Date
+        let vo2Max: Double
+        let startDateStr: String?
+    }
+
+    /// Returns all HRV records ordered by date, start_date ascending.
+    func loadHRVRecords() throws -> [HRVRecord] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT date AS date_str, value, start_date
+                FROM health_records
+                WHERE metric = 'hrv'
+                ORDER BY date, start_date
+            """)
+            return rows.compactMap { row -> HRVRecord? in
+                guard let dateStr: String = row["date_str"],
+                      let date = Self.dayFormatter.date(from: dateStr) else { return nil }
+                return HRVRecord(date: date, hrvMs: row["value"] ?? 0, startDateStr: row["start_date"])
+            }
+        }
+    }
+
+    /// Returns all resting heart rate records ordered by date.
+    func loadRHRRecords() throws -> [RHRRecord] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT date AS date_str, value
+                FROM health_records
+                WHERE metric = 'resting_heart_rate'
+                ORDER BY date
+            """)
+            return rows.compactMap { row -> RHRRecord? in
+                guard let dateStr: String = row["date_str"],
+                      let date = Self.dayFormatter.date(from: dateStr) else { return nil }
+                return RHRRecord(date: date, rhrBpm: row["value"] ?? 0)
+            }
+        }
+    }
+
+    /// Returns all VO2 max records ordered by date, start_date ascending.
+    func loadVO2MaxRecords() throws -> [VO2Record] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT date AS date_str, value, start_date
+                FROM health_records
+                WHERE metric = 'vo2_max'
+                ORDER BY date, start_date
+            """)
+            return rows.compactMap { row -> VO2Record? in
+                guard let dateStr: String = row["date_str"],
+                      let date = Self.dayFormatter.date(from: dateStr) else { return nil }
+                return VO2Record(date: date, vo2Max: row["value"] ?? 0, startDateStr: row["start_date"])
+            }
+        }
+    }
+
     // MARK: - Date Formatter
 
     private static let dayFormatter: DateFormatter = {

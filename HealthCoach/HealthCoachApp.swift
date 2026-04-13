@@ -31,6 +31,10 @@ struct ContentView: View {
                 .tabItem {
                     Label("Nutrition", systemImage: "fork.knife")
                 }
+            HeartView()
+                .tabItem {
+                    Label("Heart", systemImage: "heart.text.square")
+                }
             ActivityView()
                 .tabItem {
                     Label("Activity", systemImage: "figure.walk")

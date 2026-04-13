@@ -77,7 +77,7 @@ actor NutritionComputer {
             )
             let macroTargets = NutritionKPIMath.computeMacroPctAverages(macrosFilteredPct)
 
-            let dailyMacros = prepareMacroKcalTimeseries(macrosFilteredPct)
+            let dailyMacros = NutritionKPIMath.prepareDailyCaloriesMacrosData(macrosFilteredPct)
             let calorieBalance = computeCalorieBalance(
                 intakeRows, tdee: tdeeRows, scale: scale,
                 dateStart: dateStart, dateEnd: dateEnd,
@@ -191,130 +191,21 @@ actor NutritionComputer {
         isoFmt.date(from: s) ?? isoFmtNoFrac.date(from: s)
     }
 
-    // MARK: - prepare_macro_kcal_timeseries (lines 167-184)
-
-    private func prepareMacroKcalTimeseries(_ rows: [NutritionMacroAggregate], rollingWindowDays: Int = 7) -> DailyCaloriesMacrosData {
-        guard !rows.isEmpty else { return DailyCaloriesMacrosData(points: [], effectiveDays: 0) }
-        let sorted = rows.sorted { $0.date < $1.date }
-        let kcals = sorted.map(\.calories)
-        let rolling = centeredRollingMean(kcals, window: rollingWindowDays)
-        let effectiveDays = min(sorted.count, rollingWindowDays)
-
-        let points = sorted.enumerated().map { (i, row) in
-            DailyMacroPoint(
-                date: row.date,
-                calories: row.calories,
-                proteinKcal: row.calories * (row.protPct ?? 0) / 100,
-                carbsKcal: row.calories * (row.carbPct ?? 0) / 100,
-                fatKcal: row.calories * (row.fatPct ?? 0) / 100,
-                proteinPct: row.protPct ?? 0,
-                carbsPct: row.carbPct ?? 0,
-                fatPct: row.fatPct ?? 0,
-                rollingAvgKcal: rolling[i]
-            )
-        }
-        return DailyCaloriesMacrosData(points: points, effectiveDays: effectiveDays)
-    }
-
     // MARK: - compute_calorie_balance (lines 336-387)
 
     private func computeCalorieBalance(
         _ intakeRows: [IntakeRow], tdee tdeeRows: [TDEERow], scale scaleRows: [NutritionScaleAggregate],
         dateStart: Date, dateEnd: Date, minDate: Date
     ) -> CalorieBalanceData? {
-        let intakeByDate = Dictionary(intakeRows.map { ($0.date, $0.intakeKcal) }, uniquingKeysWith: { $1 })
-        let tdeeByDate = Dictionary(tdeeRows.map { ($0.date, $0.appleTDEE) }, uniquingKeysWith: { $1 })
-
-        // Build merged date set for selected range
-        let allDatesInRange = Set(intakeRows.map(\.date)).union(tdeeRows.map(\.date))
-            .filter { $0 >= dateStart && $0 <= dateEnd }
-            .sorted()
-
-        guard !allDatesInRange.isEmpty else { return nil }
-
-        // Empirical TDEE with lookback
-        let numberOfDays = Self.cal.dateComponents([.day], from: dateStart, to: dateEnd).day! + 1
-        let lookbackWindow = min(max(numberOfDays, 14), 30)
-        var lookbackStart = Self.cal.date(byAdding: .day, value: -lookbackWindow, to: dateStart)!
-        if lookbackStart < minDate { lookbackStart = minDate }
-
-        let intakeFull = intakeRows.filter { $0.date >= lookbackStart && $0.date <= dateEnd }.sorted { $0.date < $1.date }
-        let scaleFull = scaleRows.filter { $0.date >= lookbackStart && $0.date <= dateEnd }.sorted { $0.date < $1.date }
-
-        // Nearest-weight assignment for full range
-        let fullIntakeKcals = intakeFull.map(\.intakeKcal)
-        let fullWeights: [Double?] = intakeFull.map { intake in
-            nearestValue(in: scaleFull.compactMap { s in s.weightKg.map { (s.date, $0) } }, to: intake.date)
-        }
-
-        // diff(14) / 14
-        let empWindow = NutritionConstants.empiricalRollingWindowDays
-        var deltaKgPerDay: [Double?] = Array(repeating: nil, count: intakeFull.count)
-        for i in empWindow..<intakeFull.count {
-            if let w1 = fullWeights[i], let w0 = fullWeights[i - empWindow] {
-                deltaKgPerDay[i] = (w1 - w0) / Double(empWindow)
-            }
-        }
-
-        // rolling(14, min_periods=7).mean on intake
-        let intake14dAvg = rollingMean(fullIntakeKcals, window: empWindow, minPeriods: empWindow / 2)
-
-        // empirical_tdee = intake_14d_avg - delta_kg_per_day.fillna(0) * 7700
-        var empiricalTDEE: [Double?] = Array(repeating: nil, count: intakeFull.count)
-        for i in 0..<intakeFull.count {
-            if let avg = intake14dAvg[i] {
-                let delta = deltaKgPerDay[i] ?? 0
-                empiricalTDEE[i] = avg - delta * NutritionConstants.kcalPerKgBodyWeight
-            }
-        }
-        // ffill then bfill
-        ffillBfill(&empiricalTDEE)
-
-        // Map empirical TDEE back to selected range dates
-        var empTDEEByDate: [Date: Double] = [:]
-        for (i, row) in intakeFull.enumerated() {
-            if let v = empiricalTDEE[i] { empTDEEByDate[row.date] = v }
-        }
-        // ffill/bfill within selected range
-        var empValuesForRange: [Double?] = allDatesInRange.map { empTDEEByDate[$0] }
-        ffillBfill(&empValuesForRange)
-
-        // Build balance points
-        let rollingWindow = NutritionConstants.rollingWindowDays
-        var balanceAppleRaw: [Double?] = []
-        for d in allDatesInRange {
-            let intake = intakeByDate[d]
-            let apple = tdeeByDate[d]
-            if let i = intake, let a = apple {
-                balanceAppleRaw.append((i - a).rounded())
-            } else {
-                balanceAppleRaw.append(nil)
-            }
-        }
-
-        var balanceEmpRaw: [Double?] = []
-        for (idx, d) in allDatesInRange.enumerated() {
-            let intake = intakeByDate[d]
-            if let i = intake, let emp = empValuesForRange[idx] {
-                balanceEmpRaw.append((i - emp).rounded())
-            } else {
-                balanceEmpRaw.append(nil)
-            }
-        }
-
-        let balanceApple7d = centeredRollingMeanOptional(balanceAppleRaw, window: rollingWindow)
-        let balanceEmp7d = centeredRollingMeanOptional(balanceEmpRaw, window: rollingWindow)
-        let effectiveDays = min(allDatesInRange.count, rollingWindow)
-
-        let points = allDatesInRange.enumerated().map { (i, d) in
-            CalorieBalancePoint(
-                date: d,
-                balanceApple: balanceAppleRaw[i],
-                balanceApple7d: balanceApple7d[i].map { $0.rounded() },
-                balanceEmpirical7d: balanceEmp7d[i].map { $0.rounded() }
-            )
-        }
-        return CalorieBalanceData(points: points, effectiveDays: effectiveDays)
+        NutritionKPIMath.computeCalorieBalance(
+            intakeRows: intakeRows.map { NutritionKPIMath.CalorieBalanceIntakeRow(date: $0.date, intakeKcal: $0.intakeKcal) },
+            tdeeRows: tdeeRows.map { NutritionKPIMath.CalorieBalanceTDEERow(date: $0.date, appleTDEE: $0.appleTDEE) },
+            scaleRows: scaleRows,
+            dateStart: dateStart,
+            dateEnd: dateEnd,
+            minDate: minDate,
+            calendar: Self.cal
+        )
     }
 
     // MARK: - compute_scale_metrics (lines 390-405)
@@ -331,9 +222,9 @@ actor NutritionComputer {
             return (w * (1 - f / 100) * 100).rounded() / 100
         }
 
-        let weightRolling = centeredRollingMeanOptional(weights, window: window)
-        let fatRolling = centeredRollingMeanOptional(fats, window: window)
-        let ffmRolling = centeredRollingMeanOptional(ffms, window: window)
+        let weightRolling = NutritionKPIMath.centeredRollingMeanOptional(weights, window: window)
+        let fatRolling = NutritionKPIMath.centeredRollingMeanOptional(fats, window: window)
+        let ffmRolling = NutritionKPIMath.centeredRollingMeanOptional(ffms, window: window)
         let effectiveDays = min(filtered.count, window)
 
         let points = filtered.enumerated().map { (i, row) in
@@ -350,41 +241,7 @@ actor NutritionComputer {
     // MARK: - compute_weekly_loss_rates (lines 408-421)
 
     private func computeWeeklyLossRates(_ scale: [NutritionScaleAggregate], dateStart: Date, dateEnd: Date) -> WeeklyLossRateData? {
-        let filtered = scale.filter { $0.date >= dateStart && $0.date <= dateEnd }.sorted { $0.date < $1.date }
-        guard filtered.count >= 2 else { return nil }
-
-        let weeklyGroups = groupByMondayWeek(filtered.map { ($0.date, $0.weightKg ?? 0, $0.fatPercent) })
-        guard weeklyGroups.count >= 2 else { return nil }
-
-        let weeklyMeans: [(weekStart: Date, meanWeight: Double, meanFat: Double?)] = weeklyGroups.map { group in
-            let weights = group.values.map(\.weight)
-            let fats = group.values.compactMap(\.bf)
-            return (
-                group.weekStart,
-                (weights.mean() * 100).rounded() / 100,
-                fats.isEmpty ? nil : (fats.mean() * 100).rounded() / 100
-            )
-        }
-
-        var points: [WeeklyLossPoint] = []
-        let labelFmt = DateFormatter()
-        labelFmt.dateFormat = "MMM dd"
-        labelFmt.locale = Locale(identifier: "en_US_POSIX")
-
-        for i in 0..<weeklyMeans.count {
-            let deltaWt: Double? = i > 0 ? ((weeklyMeans[i].meanWeight - weeklyMeans[i-1].meanWeight) * 100).rounded() / 100 : nil
-            var deltaBf: Double?
-            if i > 0, let f1 = weeklyMeans[i].meanFat, let f0 = weeklyMeans[i-1].meanFat {
-                deltaBf = ((f1 - f0) * 100).rounded() / 100
-            }
-            points.append(WeeklyLossPoint(
-                weekStart: weeklyMeans[i].weekStart,
-                weekLabel: labelFmt.string(from: weeklyMeans[i].weekStart),
-                deltaWeightKg: deltaWt,
-                deltaBodyFatPct: deltaBf
-            ))
-        }
-        return WeeklyLossRateData(points: points)
+        NutritionKPIMath.computeWeeklyLossRates(scale: scale, dateStart: dateStart, dateEnd: dateEnd)
     }
 
     // MARK: - compute_workout_nutrition (lines 521-579)
@@ -485,95 +342,6 @@ actor NutritionComputer {
         return .ok
     }
 
-    // MARK: - Helpers: rolling windows
-
-    /// Centered rolling mean with min_periods=1 (mirrors pandas center=True, min_periods=1).
-    private func centeredRollingMean(_ values: [Double], window: Int) -> [Double?] {
-        let n = values.count
-        guard n > 0 else { return [] }
-        let halfBefore = (window - 1) / 2
-        let halfAfter = window / 2
-        return (0..<n).map { i in
-            let lo = max(0, i - halfBefore)
-            let hi = min(n - 1, i + halfAfter)
-            let slice = values[lo...hi]
-            return slice.isEmpty ? nil : slice.reduce(0, +) / Double(slice.count)
-        }
-    }
-
-    private func centeredRollingMeanOptional(_ values: [Double?], window: Int) -> [Double?] {
-        let n = values.count
-        guard n > 0 else { return [] }
-        let halfBefore = (window - 1) / 2
-        let halfAfter = window / 2
-        return (0..<n).map { i in
-            let lo = max(0, i - halfBefore)
-            let hi = min(n - 1, i + halfAfter)
-            let slice = values[lo...hi].compactMap { $0 }
-            return slice.isEmpty ? nil : slice.reduce(0, +) / Double(slice.count)
-        }
-    }
-
-    /// Left-aligned rolling mean (standard pandas default without center).
-    private func rollingMean(_ values: [Double], window: Int, minPeriods: Int) -> [Double?] {
-        let n = values.count
-        return (0..<n).map { i in
-            let start = max(0, i - window + 1)
-            let slice = Array(values[start...i])
-            return slice.count >= minPeriods ? slice.reduce(0, +) / Double(slice.count) : nil
-        }
-    }
-
-    /// Forward-fill then backward-fill nil values.
-    private func ffillBfill(_ arr: inout [Double?]) {
-        // Forward fill
-        for i in 1..<arr.count {
-            if arr[i] == nil { arr[i] = arr[i-1] }
-        }
-        // Backward fill
-        for i in stride(from: arr.count - 2, through: 0, by: -1) {
-            if arr[i] == nil { arr[i] = arr[i+1] }
-        }
-    }
-
-    /// Find nearest value by date from a sorted list.
-    private func nearestValue(in entries: [(Date, Double)], to target: Date) -> Double? {
-        guard !entries.isEmpty else { return nil }
-        var best = entries[0]
-        var bestDist = abs(target.timeIntervalSince(entries[0].0))
-        for e in entries.dropFirst() {
-            let dist = abs(target.timeIntervalSince(e.0))
-            if dist < bestDist { best = e; bestDist = dist }
-        }
-        return best.1
-    }
-
-    // MARK: - Helpers: week grouping
-
-    private struct WeekGroup {
-        let weekStart: Date
-        var values: [(weight: Double, bf: Double?)]
-    }
-
-    /// Group rows by ISO Monday-aligned week start (mirrors pandas dt.to_period("W").dt.start_time).
-    private func groupByMondayWeek(_ rows: [(date: Date, weight: Double, bf: Double?)]) -> [WeekGroup] {
-        var groups: [Date: WeekGroup] = [:]
-        for row in rows {
-            let weekStart = Self.mondayOfWeek(containing: row.date)
-            var group = groups[weekStart] ?? WeekGroup(weekStart: weekStart, values: [])
-            group.values.append((weight: row.weight, bf: row.bf))
-            groups[weekStart] = group
-        }
-        return groups.values.sorted { $0.weekStart < $1.weekStart }
-    }
-
-    /// Get the Monday at or before the given date.
-    private static func mondayOfWeek(containing date: Date) -> Date {
-        var cal = Calendar(identifier: .iso8601)
-        cal.firstWeekday = 2 // Monday
-        let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
-        return cal.date(from: comps)!
-    }
 }
 
 // MARK: - Array helpers

@@ -16,10 +16,15 @@ struct ActivitySnapshot: Sendable {
 struct WorkoutKPIs: Sendable {
     let totalWorkouts: Int
     let workoutsLastN: Int
+    /// Mean session length across all logged workouts (lifetime).
     let avgDurationOverallMin: Double
+    /// Mean session length in the last `priorDays` window ending at `dateEnd` (same window as `workoutsLastN`).
+    let avgDurationLastNMin: Double
+    /// Mean session length in the comparison window ending at `dateStart` (same window as prior workout count).
     let avgDurationPriorMin: Double
     let priorDays: Int
     let deltaWorkouts: Double
+    /// `avgDurationLastNMin − avgDurationPriorMin` (current window vs prior window).
     let deltaDurationMin: Double
 }
 
@@ -28,12 +33,8 @@ struct WorkoutKPIs: Sendable {
 struct MuscleRadarData: Sendable {
     /// Coarse muscle name → raw set count for current window.
     let currentCounts: [String: Int]
-    /// Coarse muscle name → raw set count for prior window.
-    let previousCounts: [String: Int]
     /// Adherence ratio (0–1.5) for current window, keyed by coarse muscle.
     let currentRatios: [String: Double]
-    /// Adherence ratio (0–1.5) for prior window, keyed by coarse muscle.
-    let previousRatios: [String: Double]
     /// Days used (min(rangeDays, 30)).
     let daysUsed: Int
 }
