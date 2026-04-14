@@ -2,7 +2,6 @@ import Foundation
 
 // REST client for the Anthropic Messages API.
 // Uses URLSession directly — no third-party SDK.
-// Logs the complete prompt to the console before every request.
 
 enum AnthropicError: LocalizedError {
     case missingAPIKey
@@ -38,12 +37,9 @@ struct AnthropicService {
     // MARK: - Public API
 
     /// Builds and sends the coaching summary request.
-    /// Logs the full system prompt + user message to the console before calling the API.
     static func generateSummary(payload: CoachPayload, apiKey: String) async throws -> String {
         let systemPrompt = try buildSystemPrompt(targets: payload.targets, profile: payload.userProfile)
         let userMessage  = buildUserMessage(payload: payload)
-
-        logPrompt(system: systemPrompt, user: userMessage)
 
         return try await callAPI(system: systemPrompt, userMessage: userMessage, apiKey: apiKey)
     }
@@ -67,8 +63,6 @@ struct AnthropicService {
     ) async throws -> String {
         let systemPrompt = try buildChatSystemPrompt(targets: targets, profile: profile)
         let messages = buildChatMessages(snapshotJSON: snapshotJSON, history: history, userMessage: userMessage)
-
-        logChatPrompt(system: systemPrompt, messages: messages)
 
         return try await callChatAPI(system: systemPrompt, messages: messages, apiKey: apiKey)
     }
@@ -173,50 +167,6 @@ struct AnthropicService {
             json = "{}"
         }
         return "<health_data>\n\(json)\n</health_data>\n\nGenerate the Weekly Summary report for the period shown in the data above."
-    }
-
-    // MARK: - Logging
-
-    private static func logChatPrompt(system: String, messages: [[String: String]]) {
-        let messagesText = messages.enumerated().map { idx, msg in
-            "[\(idx)] \(msg["role"]?.uppercased() ?? "?"): \(msg["content"] ?? "")"
-        }.joined(separator: "\n\n")
-
-        print("""
-
-        ╔══════════════════════════════════════════════════════════════════════╗
-        ║  AI COACH CHAT — FULL PROMPT (system + messages)                    ║
-        ╚══════════════════════════════════════════════════════════════════════╝
-
-        ── SYSTEM PROMPT ──────────────────────────────────────────────────────
-        \(system)
-
-        ── MESSAGES (\(messages.count) total) ──────────────────────────────────────────────
-        \(messagesText)
-
-        ╔══════════════════════════════════════════════════════════════════════╗
-        ║  END OF CHAT PROMPT                                                 ║
-        ╚══════════════════════════════════════════════════════════════════════╝
-        """)
-    }
-
-    private static func logPrompt(system: String, user: String) {
-        print("""
-
-        ╔══════════════════════════════════════════════════════════════════════╗
-        ║  AI COACH — FULL PROMPT (system + user)                             ║
-        ╚══════════════════════════════════════════════════════════════════════╝
-
-        ── SYSTEM PROMPT ──────────────────────────────────────────────────────
-        \(system)
-
-        ── USER MESSAGE ───────────────────────────────────────────────────────
-        \(user)
-
-        ╔══════════════════════════════════════════════════════════════════════╗
-        ║  END OF PROMPT                                                      ║
-        ╚══════════════════════════════════════════════════════════════════════╝
-        """)
     }
 
     // MARK: - API call
