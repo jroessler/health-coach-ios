@@ -31,8 +31,8 @@ struct WorkoutKPIs: Sendable {
 // MARK: - Muscle Radar
 
 struct MuscleRadarData: Sendable {
-    /// Coarse muscle name → raw set count for current window.
-    let currentCounts: [String: Int]
+    /// Coarse muscle name → weighted set count for current window (primary = 1.0, each secondary = 0.5).
+    let currentCounts: [String: Double]
     /// Adherence ratio (0–1.5) for current window, keyed by coarse muscle.
     let currentRatios: [String: Double]
     /// Days used (min(rangeDays, 30)).

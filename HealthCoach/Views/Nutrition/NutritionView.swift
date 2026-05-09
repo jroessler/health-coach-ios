@@ -174,24 +174,24 @@ struct NutritionView: View {
             }
         }
 
-        // Pre & Post Workout Nutrition
-        let preDesc = NutritionDescriptions.preWorkoutNutritionTiming(avgWeightKg: data.avgWeightKg ?? 0)
-        ChartSection(
-            title: "Pre-Workout Nutrition",
-            description: preDesc
-        ) {
-            PreWorkoutChart(
-                points: data.preWorkout,
-                targets: data.preWorkoutTargets
-            )
-        }
-
-        ChartSection(
-            title: "Post-Workout Nutrition",
-            description: NutritionDescriptions.postWorkoutNutritionTiming
-        ) {
-            PostWorkoutChart(points: data.postWorkout)
-        }
+        // Pre & Post Workout Nutrition (hidden — not relevant for current use)
+//        let preDesc = NutritionDescriptions.preWorkoutNutritionTiming(avgWeightKg: data.avgWeightKg ?? 0)
+//        ChartSection(
+//            title: "Pre-Workout Nutrition",
+//            description: preDesc
+//        ) {
+//            PreWorkoutChart(
+//                points: data.preWorkout,
+//                targets: data.preWorkoutTargets
+//            )
+//        }
+//
+//        ChartSection(
+//            title: "Post-Workout Nutrition",
+//            description: NutritionDescriptions.postWorkoutNutritionTiming
+//        ) {
+//            PostWorkoutChart(points: data.postWorkout)
+//        }
     }
 
     // MARK: - States

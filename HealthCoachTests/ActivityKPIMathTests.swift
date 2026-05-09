@@ -209,11 +209,12 @@ final class ActivityKPIMathTests: XCTestCase {
         let radar = ActivityKPIMath.computeMuscleRadar(
             sets,
             templateMap: ["Bench": "chest"],
+            secondaryTemplateMap: [:],
             dateStart: ds,
             dateEnd: de,
             muscleTargets: ["Chest": 7]
         )
-        XCTAssertEqual(radar.currentCounts["Chest"], 7)
+        XCTAssertEqual(radar.currentCounts["Chest"]!, 7.0, accuracy: 1e-9)
         XCTAssertEqual(radar.currentRatios["Chest"]!, 1.0, accuracy: 1e-9)
         XCTAssertEqual(radar.daysUsed, 7)
     }
@@ -229,12 +230,60 @@ final class ActivityKPIMathTests: XCTestCase {
         let radar = ActivityKPIMath.computeMuscleRadar(
             sets,
             templateMap: ["Squat": "quadriceps"],
+            secondaryTemplateMap: [:],
             dateStart: ds,
             dateEnd: de,
             muscleTargets: ["Legs": 14]
         )
         XCTAssertEqual(radar.currentRatios["Legs"]!, 0.75, accuracy: 1e-9)
         XCTAssertEqual(radar.daysUsed, 14)
+    }
+
+    func testMuscleRadar_secondaryMuscle_halfCredit() {
+        // Bench Press: primary = chest (1.0/set), secondary = [triceps] (0.5/set).
+        // 4 sets → Chest: 4.0, Triceps: 2.0.
+        let ds = sod(2026, 4, 1)
+        let de = sod(2026, 4, 7)
+        var sets: [ActivitySetInput] = []
+        for i in 0..<4 {
+            let day = cal.date(byAdding: .day, value: i, to: ds)!
+            sets.append(ActivitySetInput(date: day, exerciseTitle: "Bench Press", setType: "normal", weightKg: 100, reps: 10))
+        }
+        let radar = ActivityKPIMath.computeMuscleRadar(
+            sets,
+            templateMap: ["Bench Press": "chest"],
+            secondaryTemplateMap: ["Bench Press": ["triceps"]],
+            dateStart: ds,
+            dateEnd: de,
+            muscleTargets: ["Chest": 4, "Triceps": 4]
+        )
+        XCTAssertEqual(radar.currentCounts["Chest"]!, 4.0, accuracy: 1e-9)
+        XCTAssertEqual(radar.currentCounts["Triceps"]!, 2.0, accuracy: 1e-9)
+        XCTAssertEqual(radar.currentRatios["Chest"]!, 1.0, accuracy: 1e-9)
+        XCTAssertEqual(radar.currentRatios["Triceps"]!, 0.5, accuracy: 1e-9)
+    }
+
+    func testMuscleRadar_multipleSecondaryMuscles_eachHalfCredit() {
+        // Overhead Press: primary = shoulders, secondary = [triceps, upper_back].
+        // 6 sets → Shoulders: 6.0, Triceps: 3.0, Back: 3.0.
+        let ds = sod(2026, 4, 1)
+        let de = sod(2026, 4, 7)
+        var sets: [ActivitySetInput] = []
+        for i in 0..<6 {
+            let day = cal.date(byAdding: .day, value: i % 7, to: ds)!
+            sets.append(ActivitySetInput(date: day, exerciseTitle: "OHP", setType: "normal", weightKg: 60, reps: 8))
+        }
+        let radar = ActivityKPIMath.computeMuscleRadar(
+            sets,
+            templateMap: ["OHP": "shoulders"],
+            secondaryTemplateMap: ["OHP": ["triceps", "upper_back"]],
+            dateStart: ds,
+            dateEnd: de,
+            muscleTargets: ["Shoulders": 6, "Triceps": 6, "Back": 6]
+        )
+        XCTAssertEqual(radar.currentCounts["Shoulders"]!, 6.0, accuracy: 1e-9)
+        XCTAssertEqual(radar.currentCounts["Triceps"]!, 3.0, accuracy: 1e-9)
+        XCTAssertEqual(radar.currentCounts["Back"]!, 3.0, accuracy: 1e-9)
     }
 
     // MARK: - §6 Volume progression % change
@@ -248,7 +297,7 @@ final class ActivityKPIMathTests: XCTestCase {
             ActivitySetInput(date: noon(on: nextMonday), exerciseTitle: "Press", setType: "normal", weightKg: 100, reps: 12),
         ]
         let de = cal.date(byAdding: .day, value: 1, to: nextMonday)!
-        let vol = ActivityKPIMath.computeVolumeProgression(sets, templateMap: template, dateEnd: de)
+        let vol = ActivityKPIMath.computeVolumeProgression(sets, templateMap: template, secondaryTemplateMap: [:], dateEnd: de)
         let chestIdx = vol.muscles.firstIndex(of: "Chest")!
         let pctRow = vol.pctChange[chestIdx]
         XCTAssertFalse(pctRow.isEmpty)
@@ -268,7 +317,7 @@ final class ActivityKPIMathTests: XCTestCase {
             ActivitySetInput(date: noon(on: w1), exerciseTitle: "R3", setType: "normal", weightKg: 100, reps: 5),
         ]
         let de = cal.date(byAdding: .day, value: 1, to: w1)!
-        let vol = ActivityKPIMath.computeVolumeProgression(sets, templateMap: template, dateEnd: de)
+        let vol = ActivityKPIMath.computeVolumeProgression(sets, templateMap: template, secondaryTemplateMap: [:], dateEnd: de)
         let backI = vol.muscles.firstIndex(of: "Back")!
         let biI = vol.muscles.firstIndex(of: "Biceps")!
         let legI = vol.muscles.firstIndex(of: "Legs")!

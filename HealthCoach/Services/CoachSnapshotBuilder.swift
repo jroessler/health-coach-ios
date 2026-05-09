@@ -143,7 +143,7 @@ struct CoachActivityKPIs: Encodable {
 
 struct CoachMuscleRadar: Encodable {
     let adherenceRatios: [String: Double]
-    let setCounts: [String: Int]
+    let setCounts: [String: Double]
     let daysUsed: Int
 }
 
@@ -167,8 +167,9 @@ struct CoachNutritionSummary: Encodable {
     let macros: CoachMacroSummary
     let calorieBalance: CoachCalorieBalance?
     let weeklyLossRates: [CoachWeeklyLoss]
-    let preWorkoutAdherence: CoachWorkoutNutritionAdherence?
-    let postWorkoutAdherence: CoachWorkoutNutritionAdherence?
+    // Pre/post-workout adherence hidden — not sent to AI coach
+//    let preWorkoutAdherence: CoachWorkoutNutritionAdherence?
+//    let postWorkoutAdherence: CoachWorkoutNutritionAdherence?
 }
 
 struct CoachNutritionKPIs: Encodable {
@@ -487,19 +488,20 @@ struct CoachSnapshotBuilder {
             }
         } ?? []
 
-        let preAdherence: CoachWorkoutNutritionAdherence? = snap.preWorkout.isEmpty ? nil : {
-            let good = snap.preWorkout.filter { $0.timingQuality == .good }.count
-            let ok   = snap.preWorkout.filter { $0.timingQuality == .ok }.count
-            let bad  = snap.preWorkout.filter { $0.timingQuality == .bad }.count
-            return CoachWorkoutNutritionAdherence(totalWorkouts: snap.preWorkout.count, goodCount: good, okCount: ok, badCount: bad)
-        }()
-
-        let postAdherence: CoachWorkoutNutritionAdherence? = snap.postWorkout.isEmpty ? nil : {
-            let good = snap.postWorkout.filter { $0.quadrant == .good }.count
-            let ok   = snap.postWorkout.filter { $0.quadrant == .ok }.count
-            let bad  = snap.postWorkout.filter { $0.quadrant == .bad }.count
-            return CoachWorkoutNutritionAdherence(totalWorkouts: snap.postWorkout.count, goodCount: good, okCount: ok, badCount: bad)
-        }()
+        // Pre/post-workout adherence hidden — not sent to AI coach
+//        let preAdherence: CoachWorkoutNutritionAdherence? = snap.preWorkout.isEmpty ? nil : {
+//            let good = snap.preWorkout.filter { $0.timingQuality == .good }.count
+//            let ok   = snap.preWorkout.filter { $0.timingQuality == .ok }.count
+//            let bad  = snap.preWorkout.filter { $0.timingQuality == .bad }.count
+//            return CoachWorkoutNutritionAdherence(totalWorkouts: snap.preWorkout.count, goodCount: good, okCount: ok, badCount: bad)
+//        }()
+//
+//        let postAdherence: CoachWorkoutNutritionAdherence? = snap.postWorkout.isEmpty ? nil : {
+//            let good = snap.postWorkout.filter { $0.quadrant == .good }.count
+//            let ok   = snap.postWorkout.filter { $0.quadrant == .ok }.count
+//            let bad  = snap.postWorkout.filter { $0.quadrant == .bad }.count
+//            return CoachWorkoutNutritionAdherence(totalWorkouts: snap.postWorkout.count, goodCount: good, okCount: ok, badCount: bad)
+//        }()
 
         return CoachNutritionSummary(
             kpis: CoachNutritionKPIs(
@@ -514,9 +516,7 @@ struct CoachSnapshotBuilder {
                 avgFatPct: snap.macroTargets.avgFatPct
             ),
             calorieBalance: balanceSummary,
-            weeklyLossRates: recentLossRates,
-            preWorkoutAdherence: preAdherence,
-            postWorkoutAdherence: postAdherence
+            weeklyLossRates: recentLossRates
         )
     }
 }

@@ -75,13 +75,14 @@ struct AnthropicService {
             throw AnthropicError.missingSystemPrompt
         }
 
+        // Post-workout protein row hidden — not relevant:
+        // | Post-workout protein | ≥\(targets.proteinPostWorkoutTargetG, format: "%.0f") g within 1–2 h |
         let targetsTable = """
         <targets>
         | Parameter | Target |
         |---|---|
         | Macro split | Protein \(targets.proteinPct)% · Carbs \(targets.carbsPct)% · Fat \(targets.fatPct)% |
         | Protein per meal | ≥\(targets.proteinMealTargetG, format: "%.0f") g |
-        | Post-workout protein | ≥\(targets.proteinPostWorkoutTargetG, format: "%.0f") g within 1–2 h |
         | Weekly weight loss | \(targets.weeklyWeightLossTargetKg) kg/wk |
         | Weekly body fat loss | \(targets.weeklyBodyfatLossTargetPct) %/wk |
         | VO2 Max goal | ≥\(targets.vo2LongevityGoal, format: "%.0f") ml/kg/min |
@@ -106,13 +107,14 @@ struct AnthropicService {
             throw AnthropicError.missingSystemPrompt
         }
 
+        // Post-workout protein row hidden — not relevant:
+        // | Post-workout protein | ≥\(targets.proteinPostWorkoutTargetG, format: "%.0f") g within 1–2 h |
         let targetsTable = """
         <targets>
         | Parameter | Target |
         |---|---|
         | Macro split | Protein \(targets.proteinPct)% · Carbs \(targets.carbsPct)% · Fat \(targets.fatPct)% |
         | Protein per meal | ≥\(targets.proteinMealTargetG, format: "%.0f") g |
-        | Post-workout protein | ≥\(targets.proteinPostWorkoutTargetG, format: "%.0f") g within 1–2 h |
         | Weekly weight loss | \(targets.weeklyWeightLossTargetKg) kg/wk |
         | Weekly body fat loss | \(targets.weeklyBodyfatLossTargetPct) %/wk |
         | VO2 Max goal | ≥\(targets.vo2LongevityGoal, format: "%.0f") ml/kg/min |

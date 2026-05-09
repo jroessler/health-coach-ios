@@ -26,6 +26,7 @@ actor ActivityComputer {
             let workouts: [ActivityWorkoutInput]
             let sets: [ActivitySetInput]
             let templateMap: [String: String]
+            let secondaryTemplateMap: [String: [String]]
             var totalWorkoutCount = 0
             do {
                 let ctx = ModelContext(modelContainer)
@@ -57,6 +58,16 @@ actor ActivityComputer {
                     },
                     uniquingKeysWith: { first, _ in first }
                 )
+                secondaryTemplateMap = Dictionary(
+                    allTemplates.compactMap { t -> (String, [String])? in
+                        guard let raw = t.secondaryMuscle, !raw.isEmpty else { return nil }
+                        let muscles = raw.split(separator: ",")
+                            .map { $0.trimmingCharacters(in: .whitespaces) }
+                            .filter { !$0.isEmpty }
+                        return muscles.isEmpty ? nil : (t.title, muscles)
+                    },
+                    uniquingKeysWith: { first, _ in first }
+                )
             }
 
             let activityRows = try HealthRecordStore.shared.loadActivityDaily()
@@ -70,6 +81,7 @@ actor ActivityComputer {
             let muscleRadar = ActivityKPIMath.computeMuscleRadar(
                 sets,
                 templateMap: templateMap,
+                secondaryTemplateMap: secondaryTemplateMap,
                 dateStart: dateStart,
                 dateEnd: dateEnd,
                 muscleTargets: muscleTargets
@@ -77,6 +89,7 @@ actor ActivityComputer {
             let volumeProgression = ActivityKPIMath.computeVolumeProgression(
                 sets,
                 templateMap: templateMap,
+                secondaryTemplateMap: secondaryTemplateMap,
                 dateEnd: dateEnd
             )
             let activityKPIs = ActivityKPIMath.computeActivityKPIs(

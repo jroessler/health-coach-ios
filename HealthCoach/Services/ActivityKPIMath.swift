@@ -81,16 +81,26 @@ enum ActivityKPIMath {
     static func computeMuscleRadar(
         _ sets: [ActivitySetInput],
         templateMap: [String: String],
+        secondaryTemplateMap: [String: [String]],
         dateStart: Date,
         dateEnd: Date,
         muscleTargets: [String: Double]
     ) -> MuscleRadarData {
         let C = ActivityConstants.self
 
-        let enriched = sets.filter { $0.setType != "warmup" }.compactMap { s -> (ActivitySetInput, String)? in
+        // Each element is (set, coarse muscle, credit weight).
+        // Primary muscle: 1.0; each secondary muscle: 0.5.
+        var enriched: [(ActivitySetInput, String, Double)] = []
+        for s in sets where s.setType != "warmup" {
             let fine = templateMap[s.exerciseTitle] ?? "Other"
-            guard let coarse = C.hevyMuscleMap[fine] else { return nil }
-            return (s, coarse)
+            if let coarse = C.hevyMuscleMap[fine] {
+                enriched.append((s, coarse, 1.0))
+            }
+            for secondaryFine in secondaryTemplateMap[s.exerciseTitle] ?? [] {
+                if let coarse = C.hevyMuscleMap[secondaryFine] {
+                    enriched.append((s, coarse, 0.5))
+                }
+            }
         }
 
         let rangeDays = max(1, Self.activityCalendar.dateComponents([.day], from: dateStart, to: dateEnd).day! + 1)
@@ -100,21 +110,21 @@ enum ActivityKPIMath {
         let effectiveCurrentStart = max(dateStart, currentStart)
         let currentSets = enriched.filter { $0.0.date >= effectiveCurrentStart && $0.0.date <= dateEnd }
 
-        func setsByMuscle(_ enrichedSets: [(ActivitySetInput, String)]) -> [String: Int] {
-            var counts: [String: Int] = Dictionary(uniqueKeysWithValues: C.radarMuscles.map { ($0, 0) })
-            for (_, coarse) in enrichedSets {
-                counts[coarse, default: 0] += 1
+        func setsByMuscle(_ enrichedSets: [(ActivitySetInput, String, Double)]) -> [String: Double] {
+            var counts: [String: Double] = Dictionary(uniqueKeysWithValues: C.radarMuscles.map { ($0, 0.0) })
+            for (_, coarse, weight) in enrichedSets {
+                counts[coarse, default: 0] += weight
             }
             return counts
         }
 
         let currentCounts = setsByMuscle(currentSets)
 
-        func ratiosForPeriod(counts: [String: Int], periodStart: Date, periodEnd: Date) -> [String: Double] {
+        func ratiosForPeriod(counts: [String: Double], periodStart: Date, periodEnd: Date) -> [String: Double] {
             let days = max(1, Self.activityCalendar.dateComponents([.day], from: periodStart, to: periodEnd).day! + 1)
             var ratios: [String: Double] = [:]
             for muscle in C.radarMuscles {
-                let actual = Double(counts[muscle] ?? 0)
+                let actual = counts[muscle] ?? 0
                 let weeklyTarget = muscleTargets[muscle] ?? 0
                 guard weeklyTarget > 0 else { ratios[muscle] = 0; continue }
                 let expected = weeklyTarget * Double(days) / 7.0
@@ -137,17 +147,25 @@ enum ActivityKPIMath {
     static func computeVolumeProgression(
         _ sets: [ActivitySetInput],
         templateMap: [String: String],
+        secondaryTemplateMap: [String: [String]],
         dateEnd: Date
     ) -> VolumeProgressionData {
         let C = ActivityConstants.self
         let nWeeks = C.volumeWeeks
 
-        let enriched: [(date: Date, coarse: String, volume: Double)] = sets.compactMap { s in
-            guard s.setType != "warmup" else { return nil }
-            let fine = templateMap[s.exerciseTitle] ?? "Other"
-            guard let coarse = C.hevyMuscleMap[fine] else { return nil }
+        // Primary muscle: full volume credit; each secondary muscle: 0.5× volume credit.
+        var enriched: [(date: Date, coarse: String, volume: Double)] = []
+        for s in sets where s.setType != "warmup" {
             let vol = s.weightKg * s.reps
-            return (s.date, coarse, vol)
+            let fine = templateMap[s.exerciseTitle] ?? "Other"
+            if let coarse = C.hevyMuscleMap[fine] {
+                enriched.append((s.date, coarse, vol))
+            }
+            for secondaryFine in secondaryTemplateMap[s.exerciseTitle] ?? [] {
+                if let coarse = C.hevyMuscleMap[secondaryFine] {
+                    enriched.append((s.date, coarse, vol * 0.5))
+                }
+            }
         }
 
         let rangeStart = dateEnd.addingTimeInterval(-Double(nWeeks + 1) * 7 * 86400)

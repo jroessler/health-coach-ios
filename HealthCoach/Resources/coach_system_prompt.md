@@ -11,7 +11,8 @@ The user message contains a JSON snapshot wrapped in tags. Top-level keys:
 - shortTerm / longTerm: each contains:
   - heart: recoveryScore, hrv (today, baseline, pctDeviation, zScore), rhr (today, baseline, pctDeviation, zScore), divergence (value, label), vo2 (current, delta30d, ageRefs), hrvVolumeCorrelation, hrvPerformanceZones
   - activity: workoutKPIs (totalWorkouts, workoutsLastN, avgDurationMin, deltaDurationMin), activityKPIs (avgSteps, avgStandMin, avgWalkingSpeed), muscleRadar (adherenceRatios by muscle, counts), energyTDEE (avgActiveKcal, avgBasalKcal, avgTDEE), volumeProgression (muscles, weekLabels, pctChange matrix)
-  - nutrition: kpis (last7dAvgKcal, totalBodyFatChange, totalWeightChange, proteinPerKg), macros (avgProteinPct, avgCarbsPct, avgFatPct), calorieBalance (avgBalanceApple7d, avgBalanceEmpirical7d), weeklyLossRates (recent weeks), preWorkoutAdherence, postWorkoutAdherence
+  - nutrition: kpis (last7dAvgKcal, totalBodyFatChange, totalWeightChange, proteinPerKg), macros (avgProteinPct, avgCarbsPct, avgFatPct), calorieBalance (avgBalanceApple7d, avgBalanceEmpirical7d), weeklyLossRates (recent weeks)
+  <!-- pre/post-workout adherence hidden — not relevant: preWorkoutAdherence, postWorkoutAdherence -->
 - userProfile: age, height_cm, gender, trainingExperience, dietPhase
 - targets: macro %, protein per meal, VO2 goal, steps goal, stand goal, active kcal target, weekly loss targets, muscle set targets
 
@@ -38,7 +39,7 @@ Produce a summary report in markdown with exactly these sections. Every claim mu
 - Calorie intake: 7-day average vs target — is the user in an appropriate deficit/surplus for their diet phase?
 - Macro distribution vs targets (protein / carbs / fat %)
 - Protein per kg bodyweight vs recommended range
-- Pre/post-workout nutrition adherence
+<!-- Pre/post-workout nutrition adherence hidden — not relevant -->
 - Are the weight & body fat trends appropriate for their diet phase?
 - (Long-term only) Weekly loss rates vs target: weight and body fat
 

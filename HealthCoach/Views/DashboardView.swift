@@ -140,12 +140,12 @@ struct DashboardView: View {
             StatCard(
                 label: "Days of Data",
                 value: stats.daysOfData.formatted(),
-                subtitle: "from MacroFactor"
+                subtitle: "from Nutrition App"
             )
             StatCard(
                 label: "Food Entries",
                 value: stats.foodEntries.formatted(),
-                subtitle: "from MacroFactor"
+                subtitle: "from Nutrition App"
             )
             StatCard(
                 label: "Workout Sessions",
@@ -172,8 +172,8 @@ struct DashboardView: View {
             if let r = stats.appleRange {
                 sourceRangeRow(name: "Apple Health", range: r)
             }
-            if let r = stats.macroFactorRange {
-                sourceRangeRow(name: "MacroFactor", range: r)
+            if let r = stats.nutritionRange {
+                sourceRangeRow(name: "Nutrition", range: r)
             }
             if let r = stats.hevyRange {
                 sourceRangeRow(name: "Hevy", range: r)
@@ -260,7 +260,7 @@ actor StatsComputer {
                 workoutSessions: workoutSessions,
                 totalSets: totalSets,
                 appleRange: SourceDateRange(min: appleRange.min, max: appleRange.max),
-                macroFactorRange: SourceDateRange(min: nutritionRange.min, max: nutritionRange.max),
+                nutritionRange: SourceDateRange(min: nutritionRange.min, max: nutritionRange.max),
                 hevyRange: SourceDateRange(min: hevyRange.min, max: hevyRange.max)
             )
         } catch {
@@ -324,6 +324,6 @@ struct DashboardStats: Sendable {
     let workoutSessions: Int
     let totalSets: Int
     let appleRange: SourceDateRange?
-    let macroFactorRange: SourceDateRange?
+    let nutritionRange: SourceDateRange?
     let hevyRange: SourceDateRange?
 }
